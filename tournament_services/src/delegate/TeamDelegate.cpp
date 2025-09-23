@@ -17,8 +17,7 @@ std::shared_ptr<domain::Team> TeamDelegate::GetTeam(std::string_view id) {
     return teamRepository->ReadById(id.data());
 }
 
-std::string_view TeamDelegate::SaveTeam(const domain::Team& team){
-
+std::string_view TeamDelegate::CreateTeam(const domain::Team& team){
     return teamRepository->Create(team);
 }
 

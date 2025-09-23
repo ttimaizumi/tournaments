@@ -2,7 +2,8 @@ project(tournament_tests)
 
 set(TEST_SOURCES
         controller/TeamControllerTest.cpp
-        controller/TournamentControllerTest.cpp)
+        controller/TournamentControllerTest.cpp
+        ../src/controller/TeamController.cpp) # Not sure if this is the correct solution. Wont compile without directly linking the source.
 
 set(SOURCES ${SERVICES_SOURCES} ${TEST_SOURCES})
 

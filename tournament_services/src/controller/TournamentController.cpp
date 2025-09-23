@@ -7,7 +7,7 @@
 
 #include <string>
 #include <utility>
-#include  "domain/Tournament.hpp"
+#include "domain/Tournament.hpp"
 #include "domain/Utilities.hpp"
 
 TournamentController::TournamentController(std::shared_ptr<ITournamentDelegate> delegate) : tournamentDelegate(std::move(delegate)) {}
