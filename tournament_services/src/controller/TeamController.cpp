@@ -44,8 +44,10 @@ crow::response TeamController::SaveTeam(const crow::request& request) const {
     response.add_header("location", createdId.data());
 
     return response;
+
 }
 
 REGISTER_ROUTE(TeamController, getTeam, "/teams/<string>", "GET"_method)
 REGISTER_ROUTE(TeamController, getAllTeams, "/teams", "GET"_method)
 REGISTER_ROUTE(TeamController, SaveTeam, "/teams", "POST"_method)
+

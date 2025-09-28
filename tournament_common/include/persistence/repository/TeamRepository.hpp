@@ -5,15 +5,11 @@
 #ifndef RESTAPI_TEAMREPOSITORY_HPP
 #define RESTAPI_TEAMREPOSITORY_HPP
 #include <string>
-#include <memory>
-#include <nlohmann/json.hpp>
 
 
-#include "persistence/configuration/IDbConnectionProvider.hpp"
-#include "persistence/configuration/PostgresConnection.hpp"
 #include "IRepository.hpp"
 #include "domain/Team.hpp"
-#include "domain/Utilities.hpp"
+#include "persistence/configuration/IDbConnectionProvider.hpp"
 
 
 class TeamRepository : public IRepository<domain::Team, std::string_view> {
@@ -38,7 +34,7 @@ public:
 
         return teams;
     }
-
+  
     std::shared_ptr<domain::Team> ReadById(std::string_view id) override {
         return std::make_shared<domain::Team>();
     }
@@ -52,19 +48,16 @@ public:
         pqxx::work tx(*(connection->connection));
         pqxx::result result = tx.exec(pqxx::prepped{"insert_team"}, teamBody.dump());
 
-        tx.commit();
 
-        return result[0]["id"].c_str();
-    }
+    std::vector<std::shared_ptr<domain::Team>> ReadAll() override;
 
-    std::string_view Update(const domain::Team &entity) override {
-        return "newID";
-    }
+    std::shared_ptr<domain::Team> ReadById(std::string_view id) override;
 
+    std::string_view Create(const domain::Team &entity) override;
 
-    void Delete(std::string_view id) override{
-        
-    }
+    std::string_view Update(const domain::Team &entity) override;
+
+    void Delete(std::string_view id) override;
 };
 
 

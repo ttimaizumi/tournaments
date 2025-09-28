@@ -1,19 +1,19 @@
-project(tournament_consumer)
+# project(tournament_consumer)
 
-set(CMAKE_CXX_STANDARD 23)
-set(CONSUMER_SOURCES
-)
+# set(CMAKE_CXX_STANDARD 23)
+# set(CONSUMER_SOURCES
+# )
 
-find_package(libpqxx CONFIG REQUIRED)
-find_path(HYPODERMIC_INCLUDE_DIRS "Hypodermic/ActivatedRegistrationInfo.h")
-find_package(nlohmann_json CONFIG REQUIRED)
+# find_package(libpqxx CONFIG REQUIRED)
+# find_path(HYPODERMIC_INCLUDE_DIRS "Hypodermic/ActivatedRegistrationInfo.h")
+# find_package(nlohmann_json CONFIG REQUIRED)
 
-include_directories(include)
+# include_directories(include)
 
-add_executable(${PROJECT_NAME}
-        main.cpp
-        ${CONSUMER_SOURCES}
-)
+# add_executable(${PROJECT_NAME}
+#         main.cpp
+#         ${CONSUMER_SOURCES}
+# )
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
         Crow::Crow
@@ -24,10 +24,10 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
         tournament_common
 )
 
-target_include_directories(${PROJECT_NAME} PRIVATE ${HYPODERMIC_INCLUDE_DIRS})
+# target_include_directories(${PROJECT_NAME} PRIVATE ${HYPODERMIC_INCLUDE_DIRS})
 
-configure_file(
-        ${CMAKE_SOURCE_DIR}/${PROJECT_NAME}/configuration.json   # source file
-        ${CMAKE_BINARY_DIR}/${PROJECT_NAME}/configuration.json  # destination
-        COPYONLY
-)
+# configure_file(
+#         ${CMAKE_SOURCE_DIR}/${PROJECT_NAME}/configuration.json   # source file
+#         ${CMAKE_BINARY_DIR}/${PROJECT_NAME}/configuration.json  # destination
+#         COPYONLY
+# )

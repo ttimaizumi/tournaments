@@ -18,10 +18,11 @@ add_executable(${PROJECT_NAME}_runner
 )
 
 target_link_libraries(${PROJECT_NAME}_runner PRIVATE
+        tournament_services_lib
+        tournament_common
         GTest::gtest
         GTest::gtest_main
         GTest::gmock
-        GTest::gmock_main
-        tournament_common)
+        GTest::gmock_main)
 
 add_test(AllTestsInMain ${PROJECT_NAME}_runner)
