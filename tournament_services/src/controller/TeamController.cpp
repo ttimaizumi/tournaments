@@ -29,7 +29,7 @@ crow::response TeamController::getAllTeams() const {
     return crow::response{200, body.dump()};
 }
 
-crow::response TeamController::SaveTeam(const crow::request& request) const {
+crow::response TeamController::CreateTeam(const crow::request& request) const {
     crow::response response;
 
     if(!nlohmann::json::accept(request.body)) {
@@ -39,7 +39,7 @@ crow::response TeamController::SaveTeam(const crow::request& request) const {
     auto requestBody = nlohmann::json::parse(request.body);
     domain::Team team = requestBody;
 
-    auto createdId = teamDelegate->SaveTeam(team);
+    auto createdId = teamDelegate->CreateTeam(team);
     response.code = crow::CREATED;
     response.add_header("location", createdId.data());
 
@@ -49,5 +49,5 @@ crow::response TeamController::SaveTeam(const crow::request& request) const {
 
 REGISTER_ROUTE(TeamController, getTeam, "/teams/<string>", "GET"_method)
 REGISTER_ROUTE(TeamController, getAllTeams, "/teams", "GET"_method)
-REGISTER_ROUTE(TeamController, SaveTeam, "/teams", "POST"_method)
+REGISTER_ROUTE(TeamController, CreateTeam, "/teams", "POST"_method)
 
