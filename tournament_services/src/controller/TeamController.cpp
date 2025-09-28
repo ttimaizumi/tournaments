@@ -5,6 +5,7 @@
 #include "configuration/RouteDefinition.hpp"
 #include "controller/TeamController.hpp"
 #include "domain/Utilities.hpp"
+#include "exception/Duplicate.hpp"
 
 
 TeamController::TeamController(const std::shared_ptr<ITeamDelegate>& teamDelegate) : teamDelegate(teamDelegate) {}
@@ -39,10 +40,18 @@ crow::response TeamController::CreateTeam(const crow::request& request) const {
     auto requestBody = nlohmann::json::parse(request.body);
     domain::Team team = requestBody;
 
+    try {
     auto createdId = teamDelegate->CreateTeam(team);
     response.code = crow::CREATED;
     response.add_header("location", createdId.data());
-
+    } catch (const DuplicateException& e) {
+        response.code = crow::CONFLICT;
+        response.body = e.what();
+    } catch (const std::exception& e) {
+        response.code = crow::INTERNAL_SERVER_ERROR;
+        response.body = "Internal server error";
+    }
+    
     return response;
 
 }

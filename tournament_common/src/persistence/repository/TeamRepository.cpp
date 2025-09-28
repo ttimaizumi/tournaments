@@ -3,9 +3,11 @@
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <string>
+#include <iostream>
 
 #include "domain/Utilities.hpp"
 #include "persistence/configuration/PostgresConnection.hpp"
+#include "exception/Duplicate.hpp"
 
 TeamRepository::TeamRepository(
     std::shared_ptr<IDbConnectionProvider> connectionProvider) : connectionProvider(std::move(connectionProvider)) {}
@@ -39,11 +41,17 @@ std::string_view TeamRepository::Create(const domain::Team &entity) {
   nlohmann::json teamBody = entity;
 
   pqxx::work tx(*(connection->connection));
-  pqxx::result result = tx.exec(pqxx::prepped{"insert_team"}, teamBody.dump());
+  try {
+    pqxx::result result = tx.exec(pqxx::prepped{"insert_team"}, teamBody.dump());
+    tx.commit();
+    return result[0]["id"].c_str();
 
-  tx.commit();
-
-  return result[0]["id"].c_str();
+  } catch (const pqxx::unique_violation& e) {
+    if (e.sqlstate() == "23505") {
+        throw DuplicateException("A team with the same name already exists.");
+    }
+    throw;
+  }
 }
 
 std::string_view TeamRepository::Update(const domain::Team &entity) {
