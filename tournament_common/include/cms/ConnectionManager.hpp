@@ -19,12 +19,10 @@ public:
         connection->start();
     }
 
-    std::shared_ptr<cms::Connection> getConnection() { return connection; }
+    [[nodiscard]] std::shared_ptr<cms::Connection> Connection() const { return connection; }
 
-    std::shared_ptr<cms::Session> CreateSession() const {
-        return std::shared_ptr<cms::Session>(
-            connection->createSession(cms::Session::AUTO_ACKNOWLEDGE)
-        );
+    [[nodiscard]] std::shared_ptr<cms::Session> CreateSession() const {
+        return std::shared_ptr<cms::Session>(connection->createSession(cms::Session::AUTO_ACKNOWLEDGE));
     }
 
 private:

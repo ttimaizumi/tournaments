@@ -14,7 +14,22 @@ TournamentRepository::TournamentRepository(std::shared_ptr<IDbConnectionProvider
 }
 
 std::shared_ptr<domain::Tournament> TournamentRepository::ReadById(std::string id) {
-    return std::make_shared<domain::Tournament>(domain::Tournament());
+    auto pooled = connectionProvider->Connection();
+    const auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
+
+
+    pqxx::work tx(*(connection->connection));
+    const pqxx::result result = tx.exec(pqxx::prepped{"select_tournament_by_id"}, id);
+    tx.commit();
+
+    if (result.empty()) {
+        return nullptr;
+    }
+    nlohmann::json rowTournament = nlohmann::json::parse(result.at(0)["document"].c_str());
+    auto tournament = std::make_shared<domain::Tournament>(rowTournament);
+    tournament->Id() = result.at(0)["id"].c_str();
+
+    return tournament;
 }
 
 std::string TournamentRepository::Create (const domain::Tournament & entity) {

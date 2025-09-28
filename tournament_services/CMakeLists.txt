@@ -2,10 +2,10 @@ project(tournament_services)
 
 set(CMAKE_CXX_STANDARD 23)
 set(SERVICES_SOURCES
-        src/delegate/TeamDelegate.cpp
-        src/delegate/TournamentDelegate.cpp
-        src/controller/TeamController.cpp
-        src/controller/TournamentController.cpp)
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/delegate/TeamDelegate.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/delegate/TournamentDelegate.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/controller/TournamentController.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/controller/TeamController.cpp)
 
 include(CTest)
 enable_testing()
@@ -24,6 +24,8 @@ add_executable(${PROJECT_NAME}
         ${SERVICES_SOURCES}
 )
 
+target_link_libraries(${PROJECT_NAME} PUBLIC
+=======
 add_library(tournament_services_lib ${SERVICES_SOURCES})
 
 target_link_libraries(tournament_services_lib PUBLIC
@@ -33,8 +35,6 @@ target_link_libraries(tournament_services_lib PUBLIC
     libpqxx::pqxx
 )
 
-target_link_libraries(${PROJECT_NAME} PRIVATE
-        tournament_common
         Crow::Crow
         asio::asio
         nlohmann_json::nlohmann_json

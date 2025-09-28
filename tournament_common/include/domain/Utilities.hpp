@@ -94,6 +94,22 @@ namespace domain {
         if (json.contains("format"))
             json.at("format").get_to(tournament.Format());
     }
+
+    inline void from_json(const nlohmann::json& json, Group& group) {
+        if(json.contains("id")) {
+            group.Id() = json["id"].get<std::string>();
+        }
+        json["name"].get_to(group.Name());
+    }
+
+    inline void to_json(nlohmann::json& json, const Group& group) {
+        json["name"] = group.Name();
+        json["tournamentId"] = group.TournamentId();
+        if (!group.Id().empty()) {
+            json["id"] = group.Id();
+        }
+        json["teams"] = group.Teams();
+    }
 }
 
 #endif /* FC7CD637_41CC_48DE_8D8A_BC2CFC528D72 */

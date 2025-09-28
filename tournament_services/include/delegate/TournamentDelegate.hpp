@@ -7,8 +7,7 @@
 
 #include <string>
 
-#include <cms/Connection.hpp>
-#include <cms/QueueMessageProducer.hpp>
+#include "cms/QueueMessageProducer.hpp"
 #include "delegate/ITournamentDelegate.hpp"
 #include "persistence/repository/IRepository.hpp"
 

@@ -5,26 +5,27 @@
 #include <string>
 #include <memory>
 #include <crow.h>
+#include <nlohmann/json.hpp>
 
 #include "configuration/RouteDefinition.hpp"
+#include "delegate/IGroupDelegate.hpp"
 #include "domain/Group.hpp"
-#include "delegate/GroupDelegate.hpp"
+#include "domain/Utilities.hpp"
 
 
 class GroupController
 {
-private:
-    std::shared_ptr<GroupDelegate> groupDelegate;
+    std::shared_ptr<IGroupDelegate> groupDelegate;
 public:
-    GroupController(const std::shared_ptr<GroupDelegate>& delegate);
+    GroupController(const std::shared_ptr<IGroupDelegate>& delegate);
     ~GroupController();
     crow::response GetGroups(const std::string& tournamentId);
     crow::response GetGroup(const std::string& tournamentId, const std::string& groupId);
-    crow::response CreateGroup(const crow::request& request);
+    crow::response CreateGroup(const crow::request& request, const std::string& tournamentId);
     crow::response UpdateGroup(const crow::request& request);
 };
 
-GroupController::GroupController(const std::shared_ptr<GroupDelegate>& delegate) : groupDelegate(std::move(delegate)) {}
+GroupController::GroupController(const std::shared_ptr<IGroupDelegate>& delegate) : groupDelegate(std::move(delegate)) {}
 
 GroupController::~GroupController()
 {
@@ -36,8 +37,20 @@ crow::response GroupController::GetGroups(const std::string& tournamentId){
 crow::response GroupController::GetGroup(const std::string& tournamentId, const std::string& groupId){
     return crow::response{crow::NOT_IMPLEMENTED};
 }
-crow::response GroupController::CreateGroup(const crow::request& request){
-    return crow::response{crow::NOT_IMPLEMENTED};
+crow::response GroupController::CreateGroup(const crow::request& request, const std::string& tournamentId){
+    auto requestBody = nlohmann::json::parse(request.body);
+    domain::Group group = requestBody;
+
+    auto groupId = groupDelegate->CreateGroup(tournamentId, group);
+    crow::response response;
+    if (groupId) {
+        response.add_header("location", *groupId);
+        response.code = crow::CREATED;
+    } else {
+        response.code = 422;
+    }
+
+    return response;
 }
 crow::response GroupController::UpdateGroup(const crow::request& request){
     return crow::response{crow::NOT_IMPLEMENTED};

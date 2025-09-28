@@ -14,7 +14,7 @@
 class QueueMessageProducer: public IQueueMessageProducer {
     std::shared_ptr<ConnectionManager> connectionManager;
 public:
-    explicit QueueMessageProducer(const std::shared_ptr<ConnectionManager>& connectionManager) : connectionManager(std::move(connectionManager)){}
+    explicit QueueMessageProducer(const std::shared_ptr<ConnectionManager>& connectionManager) : connectionManager(connectionManager){}
 
     void SendMessage(const std::string_view& message, const std::string_view& queue) override {
         auto session = connectionManager->CreateSession();

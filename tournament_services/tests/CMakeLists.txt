@@ -3,8 +3,11 @@ project(tournament_tests)
 set(TEST_SOURCES
         controller/TeamControllerTest.cpp
         controller/TournamentControllerTest.cpp
+        ../src/controller/TeamController.cpp
+        ../src/controller/TournamentController.cpp
 )
-set(SOURCES ${SERVICES_SOURCES} ${TEST_SOURCES})
+
+set(SOURCES ${TEST_SOURCES})
 
 find_package(GTest CONFIG REQUIRED)
 

@@ -5,29 +5,46 @@
 #ifndef TOURNAMENTS_CONSUMER_CONTAINER_SETUP_HPP
 #define TOURNAMENTS_CONSUMER_CONTAINER_SETUP_HPP
 
-#include <Hypodermic/ContainerBuilder.h>
+#include <Hypodermic/Hypodermic.h>
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <memory>
+#include <print>
 
 #include "configuration/DatabaseConfiguration.hpp"
+#include "cms/ConnectionManager.hpp"
 #include "persistence/repository/IRepository.hpp"
 #include "persistence/repository/TeamRepository.hpp"
 #include "persistence/configuration/PostgresConnectionProvider.hpp"
 #include "persistence/repository/TournamentRepository.hpp"
+#include "cms/QueueMessageConsumer.hpp"
 
 namespace config {
     inline std::shared_ptr<Hypodermic::Container> containerSetup() {
         Hypodermic::ContainerBuilder builder;
 
         std::ifstream file("configuration.json");
-        if(file.is_open()) {
-            nlohmann::json configuration;
-            file >> configuration;
+        nlohmann::json configuration;
+        file >> configuration;
 
-            std::shared_ptr<PostgresConnectionProvider> postgressConnection = std::make_shared<PostgresConnectionProvider>(configuration["databaseConfig"]["connectionString"].get<std::string>(), configuration["databaseConfig"]["poolSize"].get<size_t>());
-            builder.registerInstance(postgressConnection).as<IDbConnectionProvider>();
-        }
+        std::shared_ptr<PostgresConnectionProvider> postgressConnection = std::make_shared<PostgresConnectionProvider>(configuration["databaseConfig"]["connectionString"].get<std::string>(), configuration["databaseConfig"]["poolSize"].get<size_t>());
+        builder.registerInstance(postgressConnection).as<IDbConnectionProvider>();
+
+        builder.registerType<ConnectionManager>()
+            .onActivated([configuration](Hypodermic::ComponentContext& context, const std::shared_ptr<ConnectionManager>& instance) {
+                instance->initialize(configuration["activemq"]["broker-url"].get<std::string>());
+            })
+            .singleInstance();
+
+        builder.registerType<QueueMessageConsumer>();
+            // .onActivated([](Hypodermic::ComponentContext& , const std::shared_ptr<QueueMessageConsumer>& instance) {
+            //     instance->QueueName() = "tournament.created";
+            //     instance->start();
+            // }).singleInstance();
+
+        // builder.registerType<QueueMessageProducer>().named("tournamentAddTeamQueue");
+        // builder.registerType<QueueResolver>().as<IResolver<IQueueMessageProducer> >().named("queueResolver").
+        //         singleInstance();
 
         builder.registerType<TeamRepository>().as<IRepository<domain::Team, std::string_view>>().singleInstance();
 
