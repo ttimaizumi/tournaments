@@ -6,6 +6,7 @@
 #include "domain/Team.hpp"
 #include "delegate/ITeamDelegate.hpp"
 #include "controller/TeamController.hpp"
+#include "exception/Duplicate.hpp"
 
 class TeamDelegateMock : public ITeamDelegate {
 public:
@@ -88,18 +89,14 @@ TEST_F(TeamControllerTest, CreateTeamTest) {
 TEST_F(TeamControllerTest, CreateTeam_Conflict) {
   EXPECT_CALL(*teamDelegateMock, CreateTeam(::testing::_))
     .WillOnce(testing::Return("new-id"))
-    .WillOnce(testing::Throw(std::runtime_error("duplicate key value")));
+    .WillOnce(testing::Throw(DuplicateException("A team with the same name already exists.")));
   
-  nlohmann::json team1RequestBody = {{"id", "id1"}, {"name", "new team"}};
-  crow::request teamRequest1;
-  teamRequest1.body = team1RequestBody.dump();
+  nlohmann::json teamRequestBody = {{"id", "new-id"}, {"name", "new team"}};
+  crow::request teamRequest;
+  teamRequest.body = teamRequestBody.dump();
 
-  nlohmann::json team2RequestBody = {{"id", "id2"}, {"name", "new team"}};
-  crow::request teamRequest2;
-  teamRequest2.body = team2RequestBody.dump();
-
-  crow::response response = teamController->CreateTeam(teamRequest1);
-  crow::response conflictResponse = teamController->CreateTeam(teamRequest2);
+  crow::response response = teamController->CreateTeam(teamRequest);
+  crow::response conflictResponse = teamController->CreateTeam(teamRequest);
 
   EXPECT_EQ(crow::CREATED, response.code);
   EXPECT_EQ(crow::CONFLICT, conflictResponse.code);
