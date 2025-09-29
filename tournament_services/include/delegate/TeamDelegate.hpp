@@ -18,6 +18,7 @@ public:
   std::shared_ptr<domain::Team> GetTeam(std::string_view id) override;
   std::vector<std::shared_ptr<domain::Team>> GetAllTeams() override;
   std::string_view CreateTeam(const domain::Team& team) override;
+  std::string_view UpdateTeam(const domain::Team& team) override;
 };
 
 #endif  // RESTAPI_TESTDELEGATE_HPP

@@ -14,6 +14,7 @@ public:
   MOCK_METHOD(std::vector<std::shared_ptr<domain::Team>>, GetAllTeams, (),
               (override));
   MOCK_METHOD(std::string_view, CreateTeam, (const domain::Team&), (override));
+  MOCK_METHOD(std::string_view, UpdateTeam, (const domain::Team&), (override));
 };
 
 class TeamControllerTest : public ::testing::Test {
@@ -76,7 +77,7 @@ TEST_F(TeamControllerTest, CreateTeamTest) {
   crow::request teamRequest;
   teamRequest.body = teamRequestBody.dump();
 
-  crow::response response = teamController->CreateTeam(teamRequest);
+  crow::response response = teamController->createTeam(teamRequest);
 
   testing::Mock::VerifyAndClearExpectations(&teamDelegateMock);
 
@@ -98,8 +99,8 @@ TEST_F(TeamControllerTest, CreateTeam_Conflict) {
   crow::request teamRequest2;
   teamRequest2.body = team2RequestBody.dump();
 
-  crow::response response = teamController->CreateTeam(teamRequest1);
-  crow::response conflictResponse = teamController->CreateTeam(teamRequest2);
+  crow::response response = teamController->createTeam(teamRequest1);
+  crow::response conflictResponse = teamController->createTeam(teamRequest2);
 
   EXPECT_EQ(crow::CREATED, response.code);
   EXPECT_EQ(crow::CONFLICT, conflictResponse.code);
