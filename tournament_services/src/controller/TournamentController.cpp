@@ -10,9 +10,8 @@
 #include "domain/Tournament.hpp"
 #include "domain/Utilities.hpp"
 #include "configuration/RouteDefinition.hpp"
-// #include "exception/Duplicate.hpp"
-// #include "exception/NotFound.hpp"
-#include "configuration/RouteDefinition.hpp"
+#include "exception/Duplicate.hpp"
+#include "exception/NotFound.hpp"
 #include <iostream>
 
 TournamentController::TournamentController(std::shared_ptr<ITournamentDelegate> delegate) : tournamentDelegate(std::move(delegate)) {}
@@ -56,8 +55,65 @@ crow::response TournamentController::ReadAll() const {
     return response;
 }
 
+crow::response TournamentController::updateTournament(const crow::request& request, const std::string& tournamentId) const {
+    crow::response response;
+
+    if (!std::regex_match(tournamentId, ID_VALUE_TOURNAMENT)) {
+        response.code = crow::BAD_REQUEST;
+        response.body = "Invalid ID format";
+        return response;
+    }
+
+    if (!nlohmann::json::accept(request.body)) {
+        response.code = crow::BAD_REQUEST;
+        response.body = "Invalid JSON";
+        return response;
+    }
+
+    auto tournament = tournamentDelegate -> GetTournament(tournamentId);
+    if(tournament == nullptr)
+    {
+        return crow::response{crow::NOT_FOUND, "Tournament not found"}; //404
+    }
+
+    auto requestBody = nlohmann::json::parse(request.body);
+    domain::Tournament tournamentObj;
+
+    try {
+        tournamentObj = requestBody;
+    } catch (const nlohmann::json::exception& e) {
+        response.code = crow::BAD_REQUEST;
+        response.body = "Request body does not match Tournament structure";
+        return response;
+    }
+
+    if (!tournamentObj.Id().empty() && tournamentObj.Id() != tournamentId) {
+        response.code = crow::BAD_REQUEST;
+        response.body = "ID is not editable";
+        return response;
+    }
+
+    tournamentObj.Id() = tournamentId;
+
+    try {
+        tournamentDelegate->UpdateTournament(tournamentObj);
+        response.code = crow::NO_CONTENT;  // 204
+
+    }
+    catch (const NotFoundException& e) {
+        response.code = crow::NOT_FOUND;
+        response.body = e.what();
+    }
+    catch (const std::exception& e) {
+        response.code = crow::INTERNAL_SERVER_ERROR;
+        response.body = "Internal server error";
+    }
+
+    return response;
+}
 
 REGISTER_ROUTE(TournamentController, getTournament, "/tournaments/<string>", "GET"_method)
+REGISTER_ROUTE(TournamentController, updateTournament, "/tournaments/<string>", "PATCH"_method)
 
 REGISTER_ROUTE(TournamentController, CreateTournament, "/tournaments", "POST"_method)
 REGISTER_ROUTE(TournamentController, ReadAll, "/tournaments", "GET"_method)

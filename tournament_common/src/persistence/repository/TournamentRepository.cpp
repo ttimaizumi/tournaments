@@ -9,6 +9,9 @@
 #include "domain/Utilities.hpp"
 #include "persistence/configuration/PostgresConnection.hpp"
 
+#include "exception/Duplicate.hpp"
+#include "exception/NotFound.hpp"
+
 
 TournamentRepository::TournamentRepository(std::shared_ptr<IDbConnectionProvider> connection) : connectionProvider(std::move(connection)) {
 }
@@ -47,7 +50,20 @@ std::string TournamentRepository::Create (const domain::Tournament & entity) {
 }
 
 std::string TournamentRepository::Update (const domain::Tournament & entity) {
-    return "id";
+
+    auto pooled = connectionProvider->Connection();
+    auto connection = dynamic_cast<PostgresConnection *>(&*pooled);
+    const nlohmann::json tournamentBody = entity;
+
+    pqxx::work tx(*(connection->connection));
+    pqxx::result result = tx.exec(pqxx::prepped{"update_tournament"}, pqxx::params{ tournamentBody.dump(), entity.Id()});
+    tx.commit();
+
+    if (result.empty()) {
+        throw NotFoundException("Tournament not found for update.");
+    }
+    return result[0]["document"].c_str();
+
 }
 
 void TournamentRepository::Delete(std::string id) {

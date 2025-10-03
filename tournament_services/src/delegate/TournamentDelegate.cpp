@@ -7,6 +7,7 @@
 #include "delegate/TournamentDelegate.hpp"
 
 #include "persistence/repository/IRepository.hpp"
+#include "domain/Utilities.hpp"
 
 TournamentDelegate::TournamentDelegate(std::shared_ptr<IRepository<domain::Tournament, std::string> > repository, std::shared_ptr<QueueMessageProducer> producer) : tournamentRepository(std::move(repository)), producer(std::move(producer)) {
 }
@@ -28,6 +29,21 @@ std::string TournamentDelegate::CreateTournament(std::shared_ptr<domain::Tournam
     //if groups are completed also create matches
 
     return id;
+}
+
+std::string TournamentDelegate::UpdateTournament(const domain::Tournament& tournament) {
+    // Check if tournament exists
+    auto existing = tournamentRepository->ReadById(tournament.Id());
+    // if (existing == nullptr) {
+    //     throw NotFoundException("Tournament not found");
+    // }
+
+    // Update the tournament
+    tournamentRepository->Update(tournament);
+    producer->SendMessage(tournament.Id(), "tournament.updated");
+
+    nlohmann::json j = tournament;
+    return j.dump();
 }
 
 std::vector<std::shared_ptr<domain::Tournament> > TournamentDelegate::ReadAll() {
