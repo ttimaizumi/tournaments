@@ -42,11 +42,18 @@ std::string TournamentRepository::Create (const domain::Tournament & entity) {
     auto pooled = connectionProvider->Connection();
     const auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
     pqxx::work tx(*(connection->connection));
-    const pqxx::result result = tx.exec(pqxx::prepped{"insert_tournament"}, tournamentDoc.dump());
 
-    tx.commit();
+    try {
+        pqxx::result result = tx.exec(pqxx::prepped{"insert_team"}, tournamentDoc.dump());
+        tx.commit();
+        return result[0]["id"].c_str();
 
-    return result[0]["id"].c_str();
+    } catch (const pqxx::unique_violation& e) {
+        if (e.sqlstate() == "23505") {
+            throw DuplicateException("A team with the same name already exists.");
+        }
+        throw;
+    }
 }
 
 std::string TournamentRepository::Update (const domain::Tournament & entity) {

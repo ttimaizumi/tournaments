@@ -39,11 +39,26 @@ crow::response TournamentController::CreateTournament(const crow::request &reque
     nlohmann::json body = nlohmann::json::parse(request.body);
     const std::shared_ptr<domain::Tournament> tournament = std::make_shared<domain::Tournament>(body);
 
-    const std::string id = tournamentDelegate->CreateTournament(tournament);
     crow::response response;
-    response.code = crow::CREATED;
-    response.add_header("location", id);
+    if (!nlohmann::json::accept(request.body)) {
+        response.code = crow::BAD_REQUEST;
+        return response;
+    }
+
+    try {
+        auto createdId = tournamentDelegate->CreateTournament(tournament);
+        response.code = crow::CREATED;
+        response.body = createdId;
+    } catch (const DuplicateException& e) {
+        response.code = crow::CONFLICT;
+        response.body = e.what();
+    }catch (const std::exception& e) {
+        response.code = crow::INTERNAL_SERVER_ERROR;
+        response.body = "Internal server error";
+    }
+
     return response;
+
 }
 
 crow::response TournamentController::ReadAll() const {
