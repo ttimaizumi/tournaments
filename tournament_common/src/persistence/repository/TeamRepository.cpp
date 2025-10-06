@@ -8,6 +8,8 @@
 #include "domain/Utilities.hpp"
 #include "persistence/configuration/PostgresConnection.hpp"
 #include "exception/Duplicate.hpp"
+#include "exception/NotFound.hpp"
+#include "exception/InvalidFormat.hpp"
 
 TeamRepository::TeamRepository(
     std::shared_ptr<IDbConnectionProvider> connectionProvider) : connectionProvider(std::move(connectionProvider)) {}
@@ -55,7 +57,43 @@ std::string_view TeamRepository::Create(const domain::Team &entity) {
 }
 
 std::string_view TeamRepository::Update(const domain::Team &entity) {
-  return "newID";
+  auto pooled = connectionProvider->Connection();
+  auto connection = dynamic_cast<PostgresConnection *>(&*pooled);
+  nlohmann::json teamBody = entity;
+
+  pqxx::work tx(*(connection->connection));
+  try {
+    pqxx::result result = tx.exec(pqxx::prepped{"update_team"}, pqxx::params{ teamBody.dump(), entity.Id }); // Should catch if url id is non uuid? or keep the 500
+    tx.commit();
+    // No rows were updated, meaning the team with the given ID does not exist
+    if (result.empty()) {
+        throw NotFoundException("Team not found for update.");
+    }
+    return result[0]["document"].c_str();
+
+  } catch (const pqxx::data_exception& e) {
+    if (e.sqlstate() == "22P02") {
+        throw InvalidFormatException("Invalid ID format.");
+    }
+    throw;
+  }
 }
 
-void TeamRepository::Delete(std::string_view id) {}
+void TeamRepository::Delete(std::string_view id) {
+  auto pooled = connectionProvider->Connection();
+  auto connection = dynamic_cast<PostgresConnection *>(&*pooled);
+
+  pqxx::work tx(*(connection->connection));
+  try {
+    pqxx::result result = tx.exec(pqxx::prepped{"delete_team"}, pqxx::params{id});
+    tx.commit();
+    if (result.empty()) {
+        throw NotFoundException("Team not found for deletion.");
+    }
+  } catch (const pqxx::data_exception& e) {
+    if (e.sqlstate() == "22P02") {
+      throw InvalidFormatException("Invalid ID format.");
+    }
+    throw;
+  }
+}
