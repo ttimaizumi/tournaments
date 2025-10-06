@@ -15,6 +15,7 @@ public:
               (override));
   MOCK_METHOD(std::string_view, CreateTeam, (const domain::Team&), (override));
   MOCK_METHOD(std::string_view, UpdateTeam, (const domain::Team&), (override));
+  MOCK_METHOD(void, DeleteTeam, (const std::string_view id), (override));
 };
 
 class TeamControllerTest : public ::testing::Test {

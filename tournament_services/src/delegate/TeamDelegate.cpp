@@ -24,3 +24,7 @@ std::string_view TeamDelegate::CreateTeam(const domain::Team& team){
 std::string_view TeamDelegate::UpdateTeam(const domain::Team& team){
     return teamRepository->Update(team);
 }
+
+void TeamDelegate::DeleteTeam(std::string_view id) {
+    teamRepository->Delete(id);
+}

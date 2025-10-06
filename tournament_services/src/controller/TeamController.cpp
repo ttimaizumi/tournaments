@@ -8,6 +8,7 @@
 #include "domain/Utilities.hpp"
 #include "exception/Duplicate.hpp"
 #include "exception/NotFound.hpp"
+#include "exception/InvalidFormat.hpp"
 #include <iostream>
 
 TeamController::TeamController(
@@ -104,6 +105,39 @@ crow::response TeamController::updateTeam(const crow::request& request, const st
     response.code = crow::NOT_FOUND;
     response.body = e.what();
 
+  } catch (const InvalidFormatException& e) {
+    response.code = crow::BAD_REQUEST;
+    response.body = e.what();
+    
+  } catch (const std::exception& e) {
+    response.code = crow::INTERNAL_SERVER_ERROR;
+    response.body = "Internal server error";
+  }
+
+  return response;
+}
+
+crow::response TeamController::deleteTeam(const std::string& teamId) const {
+  crow::response response;
+
+  if (!std::regex_match(teamId, ID_VALUE)) {
+    response.code = crow::BAD_REQUEST;
+    response.body = "Invalid ID format";
+    return response;
+  }
+
+  try {
+    teamDelegate->DeleteTeam(teamId);
+    response.code = crow::NO_CONTENT;
+    response.body = "";
+    
+  } catch (const NotFoundException& e) {
+    response.code = crow::NOT_FOUND;
+    response.body = e.what();
+  } catch (const InvalidFormatException& e) {
+    response.code = crow::BAD_REQUEST;
+    response.body = e.what();
+
   } catch (const std::exception& e) {
     response.code = crow::INTERNAL_SERVER_ERROR;
     response.body = "Internal server error";
@@ -116,3 +150,4 @@ REGISTER_ROUTE(TeamController, getTeam, "/teams/<string>", "GET"_method)
 REGISTER_ROUTE(TeamController, getAllTeams, "/teams", "GET"_method)
 REGISTER_ROUTE(TeamController, createTeam, "/teams", "POST"_method)
 REGISTER_ROUTE(TeamController, updateTeam, "/teams/<string>", "PATCH"_method)
+REGISTER_ROUTE(TeamController, deleteTeam, "/teams/<string>", "DELETE"_method)

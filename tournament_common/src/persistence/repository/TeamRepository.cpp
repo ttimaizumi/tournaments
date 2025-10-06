@@ -9,6 +9,7 @@
 #include "persistence/configuration/PostgresConnection.hpp"
 #include "exception/Duplicate.hpp"
 #include "exception/NotFound.hpp"
+#include "exception/InvalidFormat.hpp"
 
 TeamRepository::TeamRepository(
     std::shared_ptr<IDbConnectionProvider> connectionProvider) : connectionProvider(std::move(connectionProvider)) {}
@@ -72,10 +73,27 @@ std::string_view TeamRepository::Update(const domain::Team &entity) {
 
   } catch (const pqxx::data_exception& e) {
     if (e.sqlstate() == "22P02") {
-        throw NotFoundException("Invalid ID format.");
+        throw InvalidFormatException("Invalid ID format.");
     }
     throw;
   }
 }
 
-void TeamRepository::Delete(std::string_view id) {}
+void TeamRepository::Delete(std::string_view id) {
+  auto pooled = connectionProvider->Connection();
+  auto connection = dynamic_cast<PostgresConnection *>(&*pooled);
+
+  pqxx::work tx(*(connection->connection));
+  try {
+    pqxx::result result = tx.exec(pqxx::prepped{"delete_team"}, pqxx::params{id});
+    tx.commit();
+    if (result.empty()) {
+        throw NotFoundException("Team not found for deletion.");
+    }
+  } catch (const pqxx::data_exception& e) {
+    if (e.sqlstate() == "22P02") {
+      throw InvalidFormatException("Invalid ID format.");
+    }
+    throw;
+  }
+}
