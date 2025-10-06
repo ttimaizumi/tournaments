@@ -5,6 +5,7 @@
 #ifndef TOURNAMENTS_TOURNAMENTCONTROLLER_HPP
 #define TOURNAMENTS_TOURNAMENTCONTROLLER_HPP
 
+#include <regex>
 #include <memory>
 #include <crow.h>
 
