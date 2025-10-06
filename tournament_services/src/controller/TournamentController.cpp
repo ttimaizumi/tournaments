@@ -36,14 +36,15 @@ crow::response TournamentController::getTournament(const std::string& tournament
 }
 
 crow::response TournamentController::CreateTournament(const crow::request &request) const {
-    nlohmann::json body = nlohmann::json::parse(request.body);
-    const std::shared_ptr<domain::Tournament> tournament = std::make_shared<domain::Tournament>(body);
 
     crow::response response;
     if (!nlohmann::json::accept(request.body)) {
         response.code = crow::BAD_REQUEST;
         return response;
     }
+
+    auto requestBody = nlohmann::json::parse(request.body);
+    domain::Tournament tournament;
 
     try {
         auto createdId = tournamentDelegate->CreateTournament(tournament);
@@ -102,24 +103,24 @@ crow::response TournamentController::updateTournament(const crow::request& reque
         return response;
     }
 
+    // Prevent ID modification
     if (!tournamentObj.Id().empty() && tournamentObj.Id() != tournamentId) {
         response.code = crow::BAD_REQUEST;
         response.body = "ID is not editable";
         return response;
     }
 
+    // Set the ID to the path parameter
     tournamentObj.Id() = tournamentId;
 
     try {
         tournamentDelegate->UpdateTournament(tournamentObj);
         response.code = crow::NO_CONTENT;  // 204
 
-    }
-    catch (const NotFoundException& e) {
+    } catch (const NotFoundException& e) {
         response.code = crow::NOT_FOUND;
         response.body = e.what();
-    }
-    catch (const std::exception& e) {
+    } catch (const std::exception& e) {
         response.code = crow::INTERNAL_SERVER_ERROR;
         response.body = "Internal server error";
     }

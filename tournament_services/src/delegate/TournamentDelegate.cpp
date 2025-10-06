@@ -16,14 +16,14 @@ std::shared_ptr<domain::Tournament> TournamentDelegate::GetTournament(std::strin
     return tournamentRepository->ReadById(id.data());
 }
 
-std::string TournamentDelegate::CreateTournament(std::shared_ptr<domain::Tournament> tournament) {
+std::string TournamentDelegate::CreateTournament(const domain::Tournament& tournament) {
     //fill groups according to max groups
-    std::shared_ptr<domain::Tournament> tp = std::move(tournament);
+    domain::Tournament tp = tournament;
     // for (auto[i, g] = std::tuple{0, 'A'}; i < tp->Format().NumberOfGroups(); i++,g++) {
     //     tp->Groups().push_back(domain::Group{std::format("Tournament {}", g)});
     // }
 
-    std::string id = tournamentRepository->Create(*tp);
+    std::string id = tournamentRepository->Create(tp);
     producer->SendMessage(id, "tournament.created");
 
     //if groups are completed also create matches

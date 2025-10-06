@@ -10,6 +10,7 @@
 
 #include "delegate/ITournamentDelegate.hpp"
 
+
 static const std::regex ID_VALUE_TOURNAMENT("[A-Za-z0-9\\-]+");
 
 class TournamentController {
