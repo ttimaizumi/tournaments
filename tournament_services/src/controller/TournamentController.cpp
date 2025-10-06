@@ -36,13 +36,11 @@ crow::response TournamentController::getTournament(const std::string& tournament
 }
 
 crow::response TournamentController::CreateTournament(const crow::request &request) const {
-
     crow::response response;
     if (!nlohmann::json::accept(request.body)) {
         response.code = crow::BAD_REQUEST;
         return response;
     }
-
     auto requestBody = nlohmann::json::parse(request.body);
     domain::Tournament tournament;
 
@@ -82,19 +80,12 @@ crow::response TournamentController::updateTournament(const crow::request& reque
 
     if (!nlohmann::json::accept(request.body)) {
         response.code = crow::BAD_REQUEST;
-        response.body = "Invalid JSON";
+        response.body = "Invalid JSON format";
         return response;
-    }
-
-    auto tournament = tournamentDelegate -> GetTournament(tournamentId);
-    if(tournament == nullptr)
-    {
-        return crow::response{crow::NOT_FOUND, "Tournament not found"}; //404
     }
 
     auto requestBody = nlohmann::json::parse(request.body);
     domain::Tournament tournamentObj;
-
     try {
         tournamentObj = requestBody;
     } catch (const nlohmann::json::exception& e) {
@@ -103,24 +94,23 @@ crow::response TournamentController::updateTournament(const crow::request& reque
         return response;
     }
 
-    // Prevent ID modification
     if (!tournamentObj.Id().empty() && tournamentObj.Id() != tournamentId) {
         response.code = crow::BAD_REQUEST;
         response.body = "ID is not editable";
         return response;
     }
 
-    // Set the ID to the path parameter
     tournamentObj.Id() = tournamentId;
 
     try {
         tournamentDelegate->UpdateTournament(tournamentObj);
         response.code = crow::NO_CONTENT;  // 204
-
-    } catch (const NotFoundException& e) {
-        response.code = crow::NOT_FOUND;
+    }
+    catch (const NotFoundException& e) {
+        response.code = crow::NOT_FOUND; 
         response.body = e.what();
-    } catch (const std::exception& e) {
+    }
+    catch (const std::exception& e) {
         response.code = crow::INTERNAL_SERVER_ERROR;
         response.body = "Internal server error";
     }
@@ -130,6 +120,6 @@ crow::response TournamentController::updateTournament(const crow::request& reque
 
 REGISTER_ROUTE(TournamentController, getTournament, "/tournaments/<string>", "GET"_method)
 REGISTER_ROUTE(TournamentController, updateTournament, "/tournaments/<string>", "PATCH"_method)
-
+//delete y modificar update
 REGISTER_ROUTE(TournamentController, CreateTournament, "/tournaments", "POST"_method)
 REGISTER_ROUTE(TournamentController, ReadAll, "/tournaments", "GET"_method)
