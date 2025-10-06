@@ -44,6 +44,12 @@ crow::response TeamController::createTeam(const crow::request& request) const {
   }
   auto requestBody = nlohmann::json::parse(request.body);
   domain::Team team = requestBody;
+  if (!team.Id.empty()) {
+    response.code = crow::BAD_REQUEST;
+    response.body = "ID is not manually assignable";
+    return response;
+  }
+  
 
   try {
     auto createdId = teamDelegate->CreateTeam(team);
@@ -64,6 +70,7 @@ crow::response TeamController::updateTeam(const crow::request& request, const st
   crow::response response;
   if (!nlohmann::json::accept(request.body)) {
     response.code = crow::BAD_REQUEST;
+    response.body = "Invalid JSON format";
     return response;
   }
 

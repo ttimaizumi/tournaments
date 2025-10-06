@@ -61,15 +61,21 @@ std::string_view TeamRepository::Update(const domain::Team &entity) {
   nlohmann::json teamBody = entity;
 
   pqxx::work tx(*(connection->connection));
-  pqxx::result result = tx.exec(pqxx::prepped{"update_team"}, pqxx::params{ teamBody.dump(), entity.Id }); // Should catch if url id is non uuid? or keep the 500
-  tx.commit();
-  
-  // No rows were updated, meaning the team with the given ID does not exist
-  if (result.empty()) {
-      throw NotFoundException("Team not found for update.");
+  try {
+    pqxx::result result = tx.exec(pqxx::prepped{"update_team"}, pqxx::params{ teamBody.dump(), entity.Id }); // Should catch if url id is non uuid? or keep the 500
+    tx.commit();
+    // No rows were updated, meaning the team with the given ID does not exist
+    if (result.empty()) {
+        throw NotFoundException("Team not found for update.");
+    }
+    return result[0]["document"].c_str();
+
+  } catch (const pqxx::data_exception& e) {
+    if (e.sqlstate() == "22P02") {
+        throw NotFoundException("Invalid ID format.");
+    }
+    throw;
   }
-  return result[0]["document"].c_str();
-  
 }
 
 void TeamRepository::Delete(std::string_view id) {}
