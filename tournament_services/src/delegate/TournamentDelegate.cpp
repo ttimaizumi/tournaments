@@ -32,18 +32,7 @@ std::string TournamentDelegate::CreateTournament(std::shared_ptr<domain::Tournam
 }
 
 std::string TournamentDelegate::UpdateTournament(const domain::Tournament& tournament) {
-    // Check if tournament exists
-    auto existing = tournamentRepository->ReadById(tournament.Id());
-    // if (existing == nullptr) {
-    //     throw NotFoundException("Tournament not found");
-    // }
-
-    // Update the tournament
-    tournamentRepository->Update(tournament);
-    producer->SendMessage(tournament.Id(), "tournament.updated");
-
-    nlohmann::json j = tournament;
-    return j.dump();
+    return tournamentRepository->Update(tournament);
 }
 
 std::vector<std::shared_ptr<domain::Tournament> > TournamentDelegate::ReadAll() {

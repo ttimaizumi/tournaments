@@ -81,19 +81,12 @@ crow::response TournamentController::updateTournament(const crow::request& reque
 
     if (!nlohmann::json::accept(request.body)) {
         response.code = crow::BAD_REQUEST;
-        response.body = "Invalid JSON";
+        response.body = "Invalid JSON format";
         return response;
-    }
-
-    auto tournament = tournamentDelegate -> GetTournament(tournamentId);
-    if(tournament == nullptr)
-    {
-        return crow::response{crow::NOT_FOUND, "Tournament not found"}; //404
     }
 
     auto requestBody = nlohmann::json::parse(request.body);
     domain::Tournament tournamentObj;
-
     try {
         tournamentObj = requestBody;
     } catch (const nlohmann::json::exception& e) {
@@ -113,10 +106,9 @@ crow::response TournamentController::updateTournament(const crow::request& reque
     try {
         tournamentDelegate->UpdateTournament(tournamentObj);
         response.code = crow::NO_CONTENT;  // 204
-
     }
     catch (const NotFoundException& e) {
-        response.code = crow::NOT_FOUND;
+        response.code = crow::NOT_FOUND; 
         response.body = e.what();
     }
     catch (const std::exception& e) {
@@ -129,6 +121,6 @@ crow::response TournamentController::updateTournament(const crow::request& reque
 
 REGISTER_ROUTE(TournamentController, getTournament, "/tournaments/<string>", "GET"_method)
 REGISTER_ROUTE(TournamentController, updateTournament, "/tournaments/<string>", "PATCH"_method)
-
+//delete y modificar update
 REGISTER_ROUTE(TournamentController, CreateTournament, "/tournaments", "POST"_method)
 REGISTER_ROUTE(TournamentController, ReadAll, "/tournaments", "GET"_method)
