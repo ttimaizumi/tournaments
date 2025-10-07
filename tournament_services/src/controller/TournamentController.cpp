@@ -24,16 +24,24 @@ crow::response TournamentController::getTournament(const std::string& tournament
         return crow::response{crow::BAD_REQUEST, "Invalid ID format"};
     }
 
-    auto tournament = tournamentDelegate -> GetTournament(tournamentId);
-    if(tournament == nullptr)
+    try {
+        auto tournament = tournamentDelegate->GetTournament(tournamentId);
+        nlohmann::json body = tournament;
+        auto response = crow::response{crow::OK, body.dump()};
+        response.add_header("Content-Type", "application/json");
+        return response;
+    }
+    catch (const NotFoundException& e) {
+        return crow::response{crow::NOT_FOUND, e.what()};
+
+    } catch (const InvalidFormatException& e) {
+        return crow::response{crow::BAD_REQUEST, e.what()};
+
+    } catch (const std::exception& e)
     {
-        return crow::response{crow::NOT_FOUND, "Tournament not found"};
+        return crow::response{crow::INTERNAL_SERVER_ERROR, "Internal server error"};
     }
 
-    nlohmann::json body = tournament;
-    auto response = crow::response{crow::OK, body.dump()};
-    response.add_header("Content-Type", "application/json");
-    return response;
 }
 
 crow::response TournamentController::CreateTournament(const crow::request &request) const {
@@ -108,7 +116,7 @@ crow::response TournamentController::updateTournament(const crow::request& reque
         response.code = crow::NO_CONTENT;  // 204
     }
     catch (const NotFoundException& e) {
-        response.code = crow::NOT_FOUND; 
+        response.code = crow::NOT_FOUND;
         response.body = e.what();
     } catch (const InvalidFormatException& e) {
         response.code = crow::BAD_REQUEST;

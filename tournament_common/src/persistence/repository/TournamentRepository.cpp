@@ -11,6 +11,7 @@
 #include "persistence/configuration/PostgresConnection.hpp"
 
 #include "exception/Duplicate.hpp"
+#include "exception/InvalidFormat.hpp"
 #include "exception/NotFound.hpp"
 
 
@@ -27,23 +28,18 @@ std::shared_ptr<domain::Tournament> TournamentRepository::ReadById(std::string i
         tx.commit();
 
         if (result.empty()) {
-            return nullptr;
+            throw NotFoundException("Tournament not found");
         }
         nlohmann::json rowTournament = nlohmann::json::parse(result.at(0)["document"].c_str());
         auto tournament = std::make_shared<domain::Tournament>(rowTournament);
         tournament->Id() = result.at(0)["id"].c_str();
 
         return tournament;
-    } catch (const pqxx::data_exception& e) {
+    } catch (const pqxx::data_exception& e)
+    {
         // Handle invalid UUID format
         if (e.sqlstate() == "22P02") {
-            return nullptr; // Return null for invalid ID format, let controller handle 404
-        }
-        throw;
-    } catch (const pqxx::sql_error& e) {
-        // Handle other SQL errors that might occur with invalid IDs
-        if (e.sqlstate() == "22P02") {
-            return nullptr; // Return null for invalid ID format, let controller handle 404
+            throw InvalidFormatException("Invalid ID format 123");
         }
         throw;
     }
