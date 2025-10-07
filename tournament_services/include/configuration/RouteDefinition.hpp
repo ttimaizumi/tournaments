@@ -48,7 +48,7 @@ auto invokeController(Controller* controller, Method method, const crow::request
 struct Controller## _##Method##_RouteRegistrator { \
     Controller##_##Method##_RouteRegistrator() { \
         routeRegistry().push_back({ Path, HttpMethod, \
-            [](crow::SimpleApp& app, std::shared_ptr<Hypodermic::Container> container) { \
+            [](crow::SimpleApp& app, const std::shared_ptr<Hypodermic::Container>& container) { \
                     CROW_ROUTE(app, Path).methods(HttpMethod)( \
                         [container](const crow::request& request ,auto&&... args) { \
                         auto controller = container->resolve<Controller>(); \

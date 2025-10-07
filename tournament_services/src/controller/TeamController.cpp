@@ -2,6 +2,9 @@
 // Created by root on 9/27/25.
 //
 
+#define JSON_CONTENT_TYPE "application/json"
+#define CONTENT_TYPE_HEADER "content-type"
+
 #include "configuration/RouteDefinition.hpp"
 #include "controller/TeamController.hpp"
 #include "domain/Utilities.hpp"
@@ -17,7 +20,7 @@ crow::response TeamController::getTeam(const std::string& teamId) const {
     if(auto team = teamDelegate->GetTeam(teamId); team != nullptr) {
         nlohmann::json body = team;
         auto response = crow::response{crow::OK, body.dump()};
-        response.add_header("Content-Type", "application/json");
+        response.add_header(CONTENT_TYPE_HEADER, JSON_CONTENT_TYPE);
         return response;
     }
     return crow::response{crow::NOT_FOUND, "team not found"};
@@ -26,7 +29,9 @@ crow::response TeamController::getTeam(const std::string& teamId) const {
 crow::response TeamController::getAllTeams() const {
 
     nlohmann::json body = teamDelegate->GetAllTeams();
-    return crow::response{200, body.dump()};
+    crow::response response{200, body.dump()};
+    response.add_header(CONTENT_TYPE_HEADER, JSON_CONTENT_TYPE);
+    return response;
 }
 
 crow::response TeamController::CreateTeam(const crow::request& request) const {

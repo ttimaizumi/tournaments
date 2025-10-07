@@ -56,7 +56,7 @@ namespace domain {
         std::vector<Match> matches;
 
     public:
-        explicit Tournament(const std::string &name = "", TournamentFormat format = TournamentFormat()) {
+        explicit Tournament(const std::string &name = "", const TournamentFormat& format = TournamentFormat()) {
             this->name = name;
             this->format = format;
         }
