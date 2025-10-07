@@ -8,64 +8,24 @@
 #include <string>
 #include <memory>
 
+#include "IGroupRepository.hpp"
 #include "persistence/configuration/IDbConnectionProvider.hpp"
 #include "persistence/configuration/PostgresConnection.hpp"
-#include "IRepository.hpp"
 #include "domain/Group.hpp"
 
-class GroupRepository : public IRepository<domain::Group, std::string>{
+class GroupRepository : public IGroupRepository {
     std::shared_ptr<IDbConnectionProvider> connectionProvider;
 public:
-    GroupRepository(const std::shared_ptr<IDbConnectionProvider>& connectionProvider);
+    explicit GroupRepository(const std::shared_ptr<IDbConnectionProvider>& connectionProvider);
     std::shared_ptr<domain::Group> ReadById(std::string id) override;
     std::string Create (const domain::Group & entity) override;
     std::string Update (const domain::Group & entity) override;
     void Delete(std::string id) override;
     std::vector<std::shared_ptr<domain::Group>> ReadAll() override;
+    std::vector<std::shared_ptr<domain::Group>> FindByTournamentId(const std::string_view& tournamentId) override;
+    std::shared_ptr<domain::Group> FindByTournamentIdAndGroupId(const std::string_view& tournamentId, const std::string_view& groupId) override;
+    std::shared_ptr<domain::Group> FindByTournamentIdAndTeamId(const std::string_view& tournamentId, const std::string_view& teamId) override;
+    void UpdateGroupAddTeam(const std::string_view& groupId, const std::shared_ptr<domain::Team> & team) override;
 };
-
-GroupRepository::GroupRepository(const std::shared_ptr<IDbConnectionProvider>& connectionProvider) : connectionProvider(std::move(connectionProvider)) {}
-
-std::shared_ptr<domain::Group> GroupRepository::ReadById(std::string id) {
-    return std::make_shared<domain::Group>();
-}
-
-std::string GroupRepository::Create (const domain::Group & entity) {
-    auto pooled = connectionProvider->Connection();
-    auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
-    nlohmann::json groupBody = entity;
-
-    pqxx::work tx(*(connection->connection));
-    pqxx::result result = tx.exec(pqxx::prepped{"insert_group"}, groupBody.dump());
-
-    tx.commit();
-
-    return result[0]["id"].c_str();
-}
-
-std::string GroupRepository::Update (const domain::Group & entity) {
-    return "update-id";
-}
-
-void GroupRepository::Delete(std::string id) {
-
-}
-
-std::vector<std::shared_ptr<domain::Group>> GroupRepository::ReadAll() {
-    std::vector<std::shared_ptr<domain::Group>> teams;
-
-    auto pooled = connectionProvider->Connection();
-    auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
-
-    pqxx::work tx(*(connection->connection));
-    pqxx::result result{tx.exec("select id, document->>'name' as name from groups")};
-    tx.commit();
-
-    for(auto row : result){
-        teams.push_back(std::make_shared<domain::Group>(domain::Group{row["id"].c_str(), row["name"].c_str()}));
-    }
-
-    return teams;
-}
 
 #endif //TOURNAMENTS_GROUPREPOSITORY_HPP

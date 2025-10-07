@@ -2,10 +2,10 @@ project(tournament_services)
 
 set(CMAKE_CXX_STANDARD 23)
 set(SERVICES_SOURCES
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/delegate/TeamDelegate.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/delegate/TournamentDelegate.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/controller/TournamentController.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/controller/TeamController.cpp)
+        src/delegate/TeamDelegate.cpp
+        src/delegate/TournamentDelegate.cpp
+        src/controller/TournamentController.cpp
+        src/controller/TeamController.cpp)
 
 include(CTest)
 enable_testing()
