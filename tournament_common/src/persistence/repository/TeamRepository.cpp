@@ -34,7 +34,30 @@ std::vector<std::shared_ptr<domain::Team>> TeamRepository::ReadAll() {
 }
 
 std::shared_ptr<domain::Team> TeamRepository::ReadById(std::string_view id) {
-  return std::make_shared<domain::Team>();
+  auto pooled = connectionProvider->Connection();
+  const auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
+
+  pqxx::work tx(*(connection->connection));
+  try {
+      const pqxx::result result = tx.exec(pqxx::prepped{"select_team_by_id"}, pqxx::params{id});
+      tx.commit();
+
+      if (result.empty()) {
+          throw NotFoundException("Team not found.");
+      }
+      nlohmann::json rowTeam = nlohmann::json::parse(result.at(0)["document"].c_str());
+      auto team = std::make_shared<domain::Team>(rowTeam);
+      team->Id = result.at(0)["id"].c_str();
+
+      return team;
+
+  } catch (const pqxx::data_exception& e) {
+    // Handle invalid UUID format
+    if (e.sqlstate() == "22P02") {
+        throw InvalidFormatException("Invalid ID format.");
+    }
+    throw;
+  }
 }
 
 std::string_view TeamRepository::Create(const domain::Team &entity) {
@@ -46,6 +69,9 @@ std::string_view TeamRepository::Create(const domain::Team &entity) {
   try {
     pqxx::result result = tx.exec(pqxx::prepped{"insert_team"}, teamBody.dump());
     tx.commit();
+    if (result.empty()) {
+        throw NotFoundException("Team not found for deletion.");
+    }
     return result[0]["id"].c_str();
 
   } catch (const pqxx::unique_violation& e) {

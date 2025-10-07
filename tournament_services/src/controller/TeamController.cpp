@@ -19,16 +19,22 @@ crow::response TeamController::getTeam(const std::string& teamId) const {
   if (!std::regex_match(teamId, ID_VALUE)) {
     return crow::response{crow::BAD_REQUEST, "Invalid ID format"};
   }
-
-  auto team = teamDelegate->GetTeam(teamId);
-  if (team == nullptr) {
-    return crow::response{crow::NOT_FOUND, "Team not found"};
+  try {
+    auto team = teamDelegate->GetTeam(teamId);
+    nlohmann::json body = team;
+    auto response = crow::response{crow::OK, body.dump()};
+    response.add_header("Content-Type", "application/json");
+    return response;
   }
+  catch (const NotFoundException& e) {
+    return crow::response{crow::NOT_FOUND, e.what()};
 
-  nlohmann::json body = team;
-  auto response = crow::response{crow::OK, body.dump()};
-  response.add_header("Content-Type", "application/json");
-  return response;
+  } catch (const InvalidFormatException& e) {
+    return crow::response{crow::BAD_REQUEST, e.what()};
+
+  } catch (const std::exception& e) {
+    return crow::response{crow::INTERNAL_SERVER_ERROR, "Internal server error"};
+  }
 }
 
 crow::response TeamController::getAllTeams() const {
@@ -45,17 +51,15 @@ crow::response TeamController::createTeam(const crow::request& request) const {
   }
   auto requestBody = nlohmann::json::parse(request.body);
   domain::Team team = requestBody;
-  if (!team.Id.empty()) {
-    response.code = crow::BAD_REQUEST;
-    response.body = "ID is not manually assignable";
-    return response;
-  }
-  
 
   try {
     auto createdId = teamDelegate->CreateTeam(team);
     response.code = crow::CREATED;
     response.body = createdId;
+  } catch (const std::invalid_argument& e) {
+    response.code = crow::BAD_REQUEST;
+    response.body = e.what();
+
   } catch (const DuplicateException& e) {
     response.code = crow::CONFLICT;
     response.body = e.what();
@@ -77,17 +81,19 @@ crow::response TeamController::updateTeam(const crow::request& request, const st
 
   // Parse the body into a Team object
   auto requestBody = nlohmann::json::parse(request.body);
-  domain::Team teamObj;
-  try {
-    teamObj = requestBody;
-  } catch (const nlohmann::json::exception& e) {
-    response.code = crow::BAD_REQUEST;
-    response.body = "Request body does not match Team structure";
-    return response;
-  }
+  domain::Team teamObj = requestBody;
+
+  // Validate the Team object (might not be necessary if nlohmann::json does this)
+  // try {
+  //   teamObj = ;
+  // } catch (const nlohmann::json::exception& e) {
+  //   response.code = crow::BAD_REQUEST;
+  //   response.body = "Request body does not match Team structure";
+  //   return response;
+  // }
   
   // Stop users from changing the ID via the body
-  if (!teamObj.Id.empty() && teamObj.Id != teamId) {
+  if (teamObj.Id != teamId) {
     response.code = crow::BAD_REQUEST;
     response.body = "ID is not editable";
     return response;
