@@ -37,16 +37,11 @@ std::shared_ptr<domain::Tournament> TournamentRepository::ReadById(std::string i
     } catch (const pqxx::data_exception& e) {
         // Handle invalid UUID format
         if (e.sqlstate() == "22P02") {
-            return nullptr; // Return null for invalid ID format, let controller handle 404
-        }
-        throw;
-    } catch (const pqxx::sql_error& e) {
-        // Handle other SQL errors that might occur with invalid IDs
-        if (e.sqlstate() == "22P02") {
-            return nullptr; // Return null for invalid ID format, let controller handle 404
+            throw NotFoundException("Invalid ID format.");
         }
         throw;
     }
+
 }
 
 std::string TournamentRepository::Create (const domain::Tournament & entity) {
