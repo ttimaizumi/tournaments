@@ -1,14 +1,14 @@
+#include "persistence/repository/TeamRepository.hpp"
+
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <string>
 
 #include "domain/Utilities.hpp"
 #include "persistence/configuration/PostgresConnection.hpp"
-#include "persistence/repository/TeamRepository.hpp"
 
 TeamRepository::TeamRepository(
-    std::shared_ptr<IDbConnectionProvider> connectionProvider)
-    : connectionProvider(std::move(connectionProvider)) {}
+    std::shared_ptr<IDbConnectionProvider> connectionProvider) : connectionProvider(std::move(connectionProvider)) {}
 
 std::vector<std::shared_ptr<domain::Team>> TeamRepository::ReadAll() {
   std::vector<std::shared_ptr<domain::Team>> teams;
@@ -37,10 +37,6 @@ std::string_view TeamRepository::Create(const domain::Team &entity) {
   auto pooled = connectionProvider->Connection();
   auto connection = dynamic_cast<PostgresConnection *>(&*pooled);
   nlohmann::json teamBody = entity;
-  
-  // NEED TO LOOK INTO THIS!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  connection->connection->prepare(
-      "insert_team", "insert into TEAMS (document) values($1) RETURNING id");
 
   pqxx::work tx(*(connection->connection));
   pqxx::result result = tx.exec(pqxx::prepped{"insert_team"}, teamBody.dump());

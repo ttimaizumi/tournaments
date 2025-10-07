@@ -15,6 +15,7 @@ find_package(libpqxx CONFIG REQUIRED)
 find_path(HYPODERMIC_INCLUDE_DIRS "Hypodermic/ActivatedRegistrationInfo.h")
 find_package(nlohmann_json CONFIG REQUIRED)
 
+
 add_subdirectory(tests)
 
 include_directories(include)
@@ -25,21 +26,12 @@ add_executable(${PROJECT_NAME}
 )
 
 target_link_libraries(${PROJECT_NAME} PUBLIC
-=======
-add_library(tournament_services_lib ${SERVICES_SOURCES})
-
-target_link_libraries(tournament_services_lib PUBLIC
-    tournament_common
-    Crow::Crow
-    nlohmann_json::nlohmann_json
-    libpqxx::pqxx
-)
-
         Crow::Crow
         asio::asio
         nlohmann_json::nlohmann_json
         libpqxx::pqxx
-        unofficial::activemq-cpp::activemq-cpp)
+        unofficial::activemq-cpp::activemq-cpp
+        tournament_common)
 
 target_include_directories(${PROJECT_NAME} INTERFACE ${HYPODERMIC_INCLUDE_DIRS})
 
