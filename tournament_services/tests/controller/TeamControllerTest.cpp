@@ -7,6 +7,8 @@
 #include "delegate/ITeamDelegate.hpp"
 #include "controller/TeamController.hpp"
 #include "exception/Duplicate.hpp"
+#include "exception/NotFound.hpp"
+#include "exception/InvalidFormat.hpp"
 
 class TeamDelegateMock : public ITeamDelegate {
 public:
@@ -152,7 +154,7 @@ TEST_F(TeamControllerTest, UpdateTeam_Success) {
 
 TEST_F(TeamControllerTest, UpdateTeam_NotFound) {
   EXPECT_CALL(*teamDelegateMock, UpdateTeam(::testing::_))
-    .WillOnce(testing::Return(""));
+    .WillOnce(testing::Throw(NotFoundException("Team not found")));
 
   nlohmann::json teamRequestBody = {{"name", "not found"}};
   crow::request teamRequest;
