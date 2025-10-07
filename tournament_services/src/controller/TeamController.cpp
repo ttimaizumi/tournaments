@@ -51,6 +51,28 @@ crow::response TeamController::SaveTeam(const crow::request& request) const {
     return response;
 }
 
+crow::response TeamController::UpdateTeam(const std::string& teamId, const crow::request& request) const {
+    if(!std::regex_match(teamId, ID_VALUE)) {
+        return crow::response{crow::BAD_REQUEST, "Invalid ID format"};
+    }
+
+    if(!nlohmann::json::accept(request.body)) {
+        return crow::response{crow::BAD_REQUEST};
+    }
+
+    auto requestBody = nlohmann::json::parse(request.body);
+    domain::Team team = requestBody;
+    team.Id = teamId;
+
+    auto updatedId = teamDelegate->UpdateTeam(team);
+    crow::response response;
+    response.code = crow::OK;
+    response.add_header("location", updatedId.data());
+
+    return response;
+}
+
 REGISTER_ROUTE(TeamController, getTeam, "/teams/<string>", "GET"_method)
 REGISTER_ROUTE(TeamController, getAllTeams, "/teams", "GET"_method)
 REGISTER_ROUTE(TeamController, SaveTeam, "/teams", "POST"_method)
+REGISTER_ROUTE(TeamController, UpdateTeam, "/teams/<string>", "PUT"_method)

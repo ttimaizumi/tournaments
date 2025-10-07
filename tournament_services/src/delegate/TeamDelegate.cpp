@@ -22,4 +22,8 @@ std::string_view TeamDelegate::SaveTeam(const domain::Team& team){
     return teamRepository->Create(team);
 }
 
+std::string_view TeamDelegate::UpdateTeam(const domain::Team& team){
+    return teamRepository->Update(team);
+}
+
 

@@ -29,3 +29,11 @@ std::string TournamentDelegate::CreateTournament(std::shared_ptr<domain::Tournam
 std::vector<std::shared_ptr<domain::Tournament> > TournamentDelegate::ReadAll() {
     return tournamentRepository->ReadAll();
 }
+
+std::shared_ptr<domain::Tournament> TournamentDelegate::ReadById(const std::string& id) {
+    return tournamentRepository->ReadById(id);
+}
+
+void TournamentDelegate::Delete(const std::string& id) {
+    tournamentRepository->Delete(id);
+}

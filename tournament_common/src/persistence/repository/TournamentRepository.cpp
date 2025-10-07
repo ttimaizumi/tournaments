@@ -51,7 +51,12 @@ std::string TournamentRepository::Update (const domain::Tournament & entity) {
 }
 
 void TournamentRepository::Delete(std::string id) {
+    auto pooled = connectionProvider->Connection();
+    const auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
 
+    pqxx::work tx(*(connection->connection));
+    tx.exec(pqxx::prepped{"delete_tournament"}, id);
+    tx.commit();
 }
 
 std::vector<std::shared_ptr<domain::Tournament>> TournamentRepository::ReadAll() {

@@ -11,6 +11,7 @@ class TeamDelegateMock : public ITeamDelegate {
     MOCK_METHOD(std::shared_ptr<domain::Team>, GetTeam, (const std::string_view id), (override));
     MOCK_METHOD(std::vector<std::shared_ptr<domain::Team>>, GetAllTeams, (), (override));
     MOCK_METHOD(std::string_view, SaveTeam, (const domain::Team&), (override));
+    MOCK_METHOD(std::string_view, UpdateTeam, (const domain::Team&), (override));
 };
 
 class TeamControllerTest : public ::testing::Test{
@@ -83,4 +84,35 @@ TEST_F(TeamControllerTest, SaveTeamTest) {
     EXPECT_EQ(crow::CREATED, response.code);
     EXPECT_EQ(teamRequestBody.at("id").get<std::string>(), capturedTeam.Id);
     EXPECT_EQ(teamRequestBody.at("name").get<std::string>(), capturedTeam.Name);
+}
+
+TEST_F(TeamControllerTest, UpdateTeamTest) {
+    domain::Team capturedTeam;
+    EXPECT_CALL(*teamDelegateMock, UpdateTeam(::testing::_))
+        .WillOnce(testing::DoAll(
+                testing::SaveArg<0>(&capturedTeam),
+                testing::Return("updated-id")
+            )
+        );
+
+    nlohmann::json teamRequestBody = {{"name", "updated team"}};
+    crow::request teamRequest;
+    teamRequest.body = teamRequestBody.dump();
+
+    crow::response response = teamController->UpdateTeam("updated-id", teamRequest);
+
+    testing::Mock::VerifyAndClearExpectations(&teamDelegateMock);
+
+    EXPECT_EQ(crow::OK, response.code);
+    EXPECT_EQ("updated-id", capturedTeam.Id);
+    EXPECT_EQ(teamRequestBody.at("name").get<std::string>(), capturedTeam.Name);
+}
+
+TEST_F(TeamControllerTest, UpdateTeam_ErrorFormat) {
+    crow::response badRequest = teamController->UpdateTeam("", crow::request{});
+
+    EXPECT_EQ(badRequest.code, crow::BAD_REQUEST);
+
+    badRequest = teamController->UpdateTeam("mfasd#*", crow::request{});
+    EXPECT_EQ(badRequest.code, crow::BAD_REQUEST);
 }

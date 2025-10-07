@@ -24,9 +24,11 @@ public:
             connectionPool.push(std::make_unique<pqxx::connection>(connectionString.data()));
             connectionPool.back()->prepare("insert_tournament", "insert into TOURNAMENTS (document) values($1) RETURNING id");
             connectionPool.back()->prepare("select_tournament_by_id", "select * from TOURNAMENTS where id = $1");
+            connectionPool.back()->prepare("delete_tournament", "delete from TOURNAMENTS where id = $1");
 
             connectionPool.back()->prepare("insert_team", "insert into TEAMS (document) values($1) RETURNING id");
             connectionPool.back()->prepare("select_team_by_id", "select * from TEAMS where id = $1");
+            connectionPool.back()->prepare("update_team", "update TEAMS set document = $2, last_update_date = CURRENT_TIMESTAMP where id = $1 RETURNING id");
 
             connectionPool.back()->prepare("insert_group", "insert into GROUPS (tournament_id, document) values($1, $2) RETURNING id");
             connectionPool.back()->prepare("select_groups_by_tournament", "select * from GROUPS where tournament_id = $1");

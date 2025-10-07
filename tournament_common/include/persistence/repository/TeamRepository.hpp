@@ -66,7 +66,15 @@ public:
     }
 
     std::string_view Update(const domain::Team &entity) override {
-        return "newID";
+        auto pooled = connectionProvider->Connection();
+        auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
+        nlohmann::json teamBody = entity;
+
+        pqxx::work tx(*(connection->connection));
+        pqxx::result result = tx.exec(pqxx::prepped{"update_team"}, entity.Id, teamBody.dump());
+        tx.commit();
+
+        return result[0]["id"].c_str();
     }
 
 
