@@ -2,6 +2,10 @@
 // Created by root on 9/27/25.
 //
 
+#define JSON_CONTENT_TYPE "application/json"
+#define CONTENT_TYPE_HEADER "content-type"
+
+#include "configuration/RouteDefinition.hpp"
 #include "controller/TeamController.hpp"
 
 #include "configuration/RouteDefinition.hpp"

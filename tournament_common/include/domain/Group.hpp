@@ -15,9 +15,8 @@ namespace domain {
         std::vector<Team> teams;
 
     public:
-        explicit Group(const std::string_view & name, const std::string_view&  id = "") : id(id), name(name) {
+        explicit Group(const std::string_view & name = "", const std::string_view&  id = "") : id(id), name(name) {
         }
-        explicit Group() = default;
 
         [[nodiscard]] std::string Id() const {
             return  id;

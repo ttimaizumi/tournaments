@@ -8,10 +8,11 @@ set(TEST_SOURCES
 )
 
 set(SOURCES ${TEST_SOURCES})
+include_directories(../include)
 
 find_package(GTest CONFIG REQUIRED)
 
-include_directories(../include)
+
 
 add_executable(${PROJECT_NAME}_runner
     ${TEST_SOURCES}

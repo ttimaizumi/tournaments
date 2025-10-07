@@ -20,7 +20,20 @@ namespace domain {
         json.at("name").get_to(team.Name);
     }
 
-    inline void to_json(nlohmann::json& json, std::shared_ptr<Team> team) {
+    inline void from_json(const nlohmann::json& json, std::vector<Team>& teams) {
+        for (auto j = json.begin(); j != json.end(); ++j) {
+            Team team;
+            if(j.value().contains("id")) {
+                j.value().at("id").get_to(team.Id);
+            }
+            if(j.value().contains("name")) {
+                j.value().at("name").get_to(team.Name);
+            }
+            teams.push_back(team);
+        }
+    }
+
+    inline void to_json(nlohmann::json& json, const std::shared_ptr<Team>& team) {
         json = nlohmann::basic_json();
         json["name"] = team->Name;
 
@@ -61,7 +74,7 @@ namespace domain {
         }
     }
 
-    inline void to_json(nlohmann::json& json, std::shared_ptr<Tournament> tournament) {
+    inline void to_json(nlohmann::json& json, const std::shared_ptr<Tournament>& tournament) {
         json = {{"name", tournament->Name()}};
         if (!tournament->Id().empty()) {
             json["id"] = tournament->Id();
@@ -69,7 +82,7 @@ namespace domain {
         json["format"] = tournament->Format();
     }
 
-    inline void from_json(const nlohmann::json& json, std::shared_ptr<Tournament> tournament) {
+    inline void from_json(const nlohmann::json& json, std::shared_ptr<Tournament>& tournament) {
         if(json.contains("id")) {
             tournament->Id() = json["id"].get<std::string>();
         }
@@ -99,7 +112,34 @@ namespace domain {
         if(json.contains("id")) {
             group.Id() = json["id"].get<std::string>();
         }
+        if(json.contains("tournamentId")) {
+            group.TournamentId() = json["tournamentId"].get<std::string>();
+        }
         json["name"].get_to(group.Name());
+        json["teams"].get_to(group.Teams());
+    }
+
+    inline void to_json(nlohmann::json& json, const std::shared_ptr<Group>& group) {
+        json["name"] = group->Name();
+        json["tournamentId"] = group->TournamentId();
+        if (!group->Id().empty()) {
+            json["id"] = group->Id();
+        }
+        json["teams"] = group->Teams();
+    }
+
+    inline void to_json(nlohmann::json& json, const std::vector<std::shared_ptr<Group>>& groups) {
+        json = nlohmann::json::array();
+        for (const auto& group : groups) {
+            auto jsonGroup = nlohmann::json();
+            jsonGroup["name"] = group->Name();
+            jsonGroup["tournamentId"] = group->TournamentId();
+            if (!group->Id().empty()) {
+                jsonGroup["id"] = group->Id();
+            }
+            jsonGroup["teams"] = group->Teams();
+            json.push_back(jsonGroup);
+        }
     }
 
     inline void to_json(nlohmann::json& json, const Group& group) {
