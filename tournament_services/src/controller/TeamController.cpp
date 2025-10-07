@@ -91,9 +91,9 @@ crow::response TeamController::updateTeam(const crow::request& request, const st
   //   response.body = "Request body does not match Team structure";
   //   return response;
   // }
-  
+
   // Stop users from changing the ID via the body
-  if (teamObj.Id != teamId) {
+  if (!teamObj.Id.empty()) {
     response.code = crow::BAD_REQUEST;
     response.body = "ID is not editable";
     return response;
