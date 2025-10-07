@@ -7,52 +7,157 @@
 
 #include "configuration/RouteDefinition.hpp"
 #include "controller/TeamController.hpp"
+
+#include "configuration/RouteDefinition.hpp"
 #include "domain/Utilities.hpp"
+#include "exception/Duplicate.hpp"
+#include "exception/NotFound.hpp"
+#include "exception/InvalidFormat.hpp"
+#include <iostream>
 
-
-TeamController::TeamController(const std::shared_ptr<ITeamDelegate>& teamDelegate) : teamDelegate(teamDelegate) {}
+TeamController::TeamController(
+    const std::shared_ptr<ITeamDelegate>& teamDelegate)
+    : teamDelegate(teamDelegate) {}
 
 crow::response TeamController::getTeam(const std::string& teamId) const {
-    if(!std::regex_match(teamId, ID_VALUE)) {
-        return crow::response{crow::BAD_REQUEST, "Invalid ID format"};
-    }
+  if (!std::regex_match(teamId, ID_VALUE)) {
+    return crow::response{crow::BAD_REQUEST, "Invalid ID format"};
+  }
+  try {
+    auto team = teamDelegate->GetTeam(teamId);
+    nlohmann::json body = team;
+    auto response = crow::response{crow::OK, body.dump()};
+    response.add_header("Content-Type", "application/json");
+    return response;
+  }
+  catch (const NotFoundException& e) {
+    return crow::response{crow::NOT_FOUND, e.what()};
 
-    if(auto team = teamDelegate->GetTeam(teamId); team != nullptr) {
-        nlohmann::json body = team;
-        auto response = crow::response{crow::OK, body.dump()};
-        response.add_header(CONTENT_TYPE_HEADER, JSON_CONTENT_TYPE);
-        return response;
-    }
-    return crow::response{crow::NOT_FOUND, "team not found"};
+  } catch (const InvalidFormatException& e) {
+    return crow::response{crow::BAD_REQUEST, e.what()};
+
+  } catch (const std::exception& e) {
+    return crow::response{crow::INTERNAL_SERVER_ERROR, "Internal server error"};
+  }
 }
 
 crow::response TeamController::getAllTeams() const {
-
-    nlohmann::json body = teamDelegate->GetAllTeams();
-    crow::response response{200, body.dump()};
-    response.add_header(CONTENT_TYPE_HEADER, JSON_CONTENT_TYPE);
-    return response;
+  nlohmann::json body = teamDelegate->GetAllTeams();
+  return crow::response{200, body.dump()};
 }
 
-crow::response TeamController::CreateTeam(const crow::request& request) const {
-    crow::response response;
+crow::response TeamController::createTeam(const crow::request& request) const {
+  crow::response response;
 
-    if(!nlohmann::json::accept(request.body)) {
-        response.code = crow::BAD_REQUEST;
-        return response;
-    }
-    auto requestBody = nlohmann::json::parse(request.body);
-    domain::Team team = requestBody;
+  if (!nlohmann::json::accept(request.body)) {
+    response.code = crow::BAD_REQUEST;
+    return response;
+  }
+  auto requestBody = nlohmann::json::parse(request.body);
+  domain::Team team = requestBody;
 
+  try {
     auto createdId = teamDelegate->CreateTeam(team);
     response.code = crow::CREATED;
-    response.add_header("location", createdId.data());
+    response.body = createdId;
+  } catch (const std::invalid_argument& e) {
+    response.code = crow::BAD_REQUEST;
+    response.body = e.what();
 
+  } catch (const DuplicateException& e) {
+    response.code = crow::CONFLICT;
+    response.body = e.what();
+  } catch (const std::exception& e) {
+    response.code = crow::INTERNAL_SERVER_ERROR;
+    response.body = "Internal server error";
+  }
+
+  return response;
+}
+
+crow::response TeamController::updateTeam(const crow::request& request, const std::string& teamId) const {
+  crow::response response;
+  if (!nlohmann::json::accept(request.body)) {
+    response.code = crow::BAD_REQUEST;
+    response.body = "Invalid JSON format";
     return response;
+  }
 
+  // Parse the body into a Team object
+  auto requestBody = nlohmann::json::parse(request.body);
+  domain::Team teamObj = requestBody;
+
+  // Validate the Team object (might not be necessary if nlohmann::json does this)
+  // try {
+  //   teamObj = ;
+  // } catch (const nlohmann::json::exception& e) {
+  //   response.code = crow::BAD_REQUEST;
+  //   response.body = "Request body does not match Team structure";
+  //   return response;
+  // }
+
+  // Stop users from changing the ID via the body
+  if (!teamObj.Id.empty()) {
+    response.code = crow::BAD_REQUEST;
+    response.body = "ID is not editable";
+    return response;
+  }
+  // Set the ID to the path parameter to ensure they match
+  teamObj.Id = teamId;
+
+  // Try to PATCH the team
+  try {
+    auto team = teamDelegate->UpdateTeam(teamObj);
+    response.code = crow::OK;
+    response.body = team;
+    
+  } catch (const NotFoundException& e) {
+    response.code = crow::NOT_FOUND;
+    response.body = e.what();
+
+  } catch (const InvalidFormatException& e) {
+    response.code = crow::BAD_REQUEST;
+    response.body = e.what();
+    
+  } catch (const std::exception& e) {
+    response.code = crow::INTERNAL_SERVER_ERROR;
+    response.body = "Internal server error";
+  }
+
+  return response;
+}
+
+crow::response TeamController::deleteTeam(const std::string& teamId) const {
+  crow::response response;
+
+  if (!std::regex_match(teamId, ID_VALUE)) {
+    response.code = crow::BAD_REQUEST;
+    response.body = "Invalid ID format";
+    return response;
+  }
+
+  try {
+    teamDelegate->DeleteTeam(teamId);
+    response.code = crow::NO_CONTENT;
+    response.body = "";
+    
+  } catch (const NotFoundException& e) {
+    response.code = crow::NOT_FOUND;
+    response.body = e.what();
+  } catch (const InvalidFormatException& e) {
+    response.code = crow::BAD_REQUEST;
+    response.body = e.what();
+
+  } catch (const std::exception& e) {
+    response.code = crow::INTERNAL_SERVER_ERROR;
+    response.body = "Internal server error";
+  }
+
+  return response;
 }
 
 REGISTER_ROUTE(TeamController, getTeam, "/teams/<string>", "GET"_method)
 REGISTER_ROUTE(TeamController, getAllTeams, "/teams", "GET"_method)
-REGISTER_ROUTE(TeamController, CreateTeam, "/teams", "POST"_method)
-
+REGISTER_ROUTE(TeamController, createTeam, "/teams", "POST"_method)
+REGISTER_ROUTE(TeamController, updateTeam, "/teams/<string>", "PATCH"_method)
+REGISTER_ROUTE(TeamController, deleteTeam, "/teams/<string>", "DELETE"_method)
