@@ -6,6 +6,9 @@
 #include "domain/Team.hpp"
 #include "delegate/ITeamDelegate.hpp"
 #include "controller/TeamController.hpp"
+#include "exception/Duplicate.hpp"
+#include "exception/NotFound.hpp"
+#include "exception/InvalidFormat.hpp"
 
 class TeamDelegateMock : public ITeamDelegate {
 public:
@@ -27,11 +30,6 @@ protected:
     teamDelegateMock = std::make_shared<TeamDelegateMock>();
     teamController =
         std::make_shared<TeamController>(TeamController(teamDelegateMock));
-  }
-
-  // TearDown() function
-  void TearDown() override {
-    // teardown code comes here
   }
 };
 
@@ -68,13 +66,43 @@ TEST_F(TeamControllerTest, GetTeamNotFound) {
   EXPECT_EQ(crow::NOT_FOUND, response.code);
 }
 
+// GET /teams
+TEST_F(TeamControllerTest, GetAllTeams_ReturnsList) {
+  std::vector<std::shared_ptr<domain::Team>> teams = {
+    std::make_shared<domain::Team>(domain::Team{"id1", "Team One"}),
+    std::make_shared<domain::Team>(domain::Team{"id2", "Team Two"})
+  };
+
+  EXPECT_CALL(*teamDelegateMock, GetAllTeams())
+    .WillOnce(testing::Return(teams));
+
+  crow::response response = teamController->getAllTeams();
+  auto jsonResponse = crow::json::load(response.body);
+
+  EXPECT_EQ(crow::OK, response.code);
+  ASSERT_EQ(jsonResponse.size(), teams.size());
+  EXPECT_EQ(jsonResponse[0]["id"], teams[0]->Id);
+  EXPECT_EQ(jsonResponse[1]["name"], teams[1]->Name);
+}
+
+TEST_F(TeamControllerTest, GetAllTeams_ReturnsEmptyList) {
+  EXPECT_CALL(*teamDelegateMock, GetAllTeams())
+    .WillOnce(testing::Return(std::vector<std::shared_ptr<domain::Team>>{}));
+
+  crow::response response = teamController->getAllTeams();
+  auto jsonResponse = crow::json::load(response.body);
+
+  EXPECT_EQ(crow::OK, response.code);
+  ASSERT_EQ(jsonResponse.size(), 0);
+}
+
 // POST /teams
 TEST_F(TeamControllerTest, CreateTeamTest) {
   domain::Team capturedTeam;
   EXPECT_CALL(*teamDelegateMock, CreateTeam(::testing::_))
     .WillOnce(testing::DoAll(testing::SaveArg<0>(&capturedTeam), testing::Return("new-id")));
 
-  nlohmann::json teamRequestBody = {{"id", "new-id"}, {"name", "new team"}};
+  nlohmann::json teamRequestBody = {{"name", "new team"}};
   crow::request teamRequest;
   teamRequest.body = teamRequestBody.dump();
 
@@ -83,20 +111,20 @@ TEST_F(TeamControllerTest, CreateTeamTest) {
   testing::Mock::VerifyAndClearExpectations(&teamDelegateMock);
 
   EXPECT_EQ(crow::CREATED, response.code);
-  EXPECT_EQ(teamRequestBody.at("id").get<std::string>(), capturedTeam.Id);
+  // EXPECT_EQ(teamRequestBody.at("id").get<std::string>(), capturedTeam.Id);
   EXPECT_EQ(teamRequestBody.at("name").get<std::string>(), capturedTeam.Name);
 }
 
 TEST_F(TeamControllerTest, CreateTeam_Conflict) {
   EXPECT_CALL(*teamDelegateMock, CreateTeam(::testing::_))
     .WillOnce(testing::Return("new-id"))
-    .WillOnce(testing::Throw(std::runtime_error("duplicate key value")));
+    .WillOnce(testing::Throw(DuplicateException("A team with the same name already exists.")));
   
-  nlohmann::json team1RequestBody = {{"id", "id1"}, {"name", "new team"}};
+  nlohmann::json team1RequestBody = {{"name", "new team"}};  // ✅ Sin "id"
   crow::request teamRequest1;
   teamRequest1.body = team1RequestBody.dump();
 
-  nlohmann::json team2RequestBody = {{"id", "id2"}, {"name", "new team"}};
+  nlohmann::json team2RequestBody = {{"name", "new team"}};  // ✅ Sin "id"
   crow::request teamRequest2;
   teamRequest2.body = team2RequestBody.dump();
 
@@ -105,4 +133,34 @@ TEST_F(TeamControllerTest, CreateTeam_Conflict) {
 
   EXPECT_EQ(crow::CREATED, response.code);
   EXPECT_EQ(crow::CONFLICT, conflictResponse.code);
+}
+
+// PATCH /teams/{id}
+TEST_F(TeamControllerTest, UpdateTeam_Success) {
+  domain::Team capturedTeam;
+  EXPECT_CALL(*teamDelegateMock, UpdateTeam(::testing::_))
+    .WillOnce(testing::DoAll(testing::SaveArg<0>(&capturedTeam), testing::Return("id1")));
+
+  nlohmann::json teamRequestBody = {{"name", "updated team"}};
+  crow::request teamRequest;
+  teamRequest.body = teamRequestBody.dump();
+
+  crow::response response = teamController->updateTeam(teamRequest, "id1");
+
+  EXPECT_EQ(crow::OK, response.code);
+  EXPECT_EQ("id1", capturedTeam.Id);
+  EXPECT_EQ(teamRequestBody.at("name").get<std::string>(), capturedTeam.Name);
+}
+
+TEST_F(TeamControllerTest, UpdateTeam_NotFound) {
+  EXPECT_CALL(*teamDelegateMock, UpdateTeam(::testing::_))
+    .WillOnce(testing::Throw(NotFoundException("Team not found")));
+
+  nlohmann::json teamRequestBody = {{"name", "not found"}};
+  crow::request teamRequest;
+  teamRequest.body = teamRequestBody.dump();
+
+  crow::response response = teamController->updateTeam(teamRequest, "id404");
+
+  EXPECT_EQ(crow::NOT_FOUND, response.code);
 }
