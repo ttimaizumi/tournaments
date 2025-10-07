@@ -51,24 +51,24 @@ crow::response TeamController::SaveTeam(const crow::request& request) const {
     return response;
 }
 
-crow::response TeamController::UpdateTeam(const std::string& teamId, const crow::request& request) const {
-    if(!std::regex_match(teamId, ID_VALUE)) {
+crow::response TeamController::UpdateTeam(const crow::request& request, const std::string& teamId) const {
+    if (!std::regex_match(teamId, ID_VALUE)) {
         return crow::response{crow::BAD_REQUEST, "Invalid ID format"};
     }
 
-    if(!nlohmann::json::accept(request.body)) {
-        return crow::response{crow::BAD_REQUEST};
+    if (!nlohmann::json::accept(request.body)) {
+        return crow::response{crow::BAD_REQUEST, "Invalid JSON"};
     }
 
-    auto requestBody = nlohmann::json::parse(request.body);
-    domain::Team team = requestBody;
+    nlohmann::json body = nlohmann::json::parse(request.body);
+    domain::Team team = body;
     team.Id = teamId;
 
-    auto updatedId = teamDelegate->UpdateTeam(team);
+    std::string updatedId = teamDelegate->UpdateTeam(team);
+
     crow::response response;
     response.code = crow::OK;
-    response.add_header("location", updatedId.data());
-
+    response.add_header("location", updatedId);
     return response;
 }
 

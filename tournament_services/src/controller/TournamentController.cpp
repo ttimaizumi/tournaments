@@ -14,6 +14,9 @@
 #include  "domain/Tournament.hpp"
 #include "domain/Utilities.hpp"
 
+extern const std::regex ID_VALUE; // declaration in header
+
+
 TournamentController::TournamentController(std::shared_ptr<ITournamentDelegate> delegate) : tournamentDelegate(std::move(delegate)) {}
 
 crow::response TournamentController::CreateTournament(const crow::request &request) const {
