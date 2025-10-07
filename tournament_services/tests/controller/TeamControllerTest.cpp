@@ -6,6 +6,7 @@
 #include "domain/Team.hpp"
 #include "delegate/ITeamDelegate.hpp"
 #include "controller/TeamController.hpp"
+#include "exception/Duplicate.hpp"
 
 class TeamDelegateMock : public ITeamDelegate {
 public:
@@ -99,7 +100,7 @@ TEST_F(TeamControllerTest, CreateTeamTest) {
   EXPECT_CALL(*teamDelegateMock, CreateTeam(::testing::_))
     .WillOnce(testing::DoAll(testing::SaveArg<0>(&capturedTeam), testing::Return("new-id")));
 
-  nlohmann::json teamRequestBody = {{"id", "new-id"}, {"name", "new team"}};
+  nlohmann::json teamRequestBody = {{"name", "new team"}};
   crow::request teamRequest;
   teamRequest.body = teamRequestBody.dump();
 
@@ -108,20 +109,20 @@ TEST_F(TeamControllerTest, CreateTeamTest) {
   testing::Mock::VerifyAndClearExpectations(&teamDelegateMock);
 
   EXPECT_EQ(crow::CREATED, response.code);
-  EXPECT_EQ(teamRequestBody.at("id").get<std::string>(), capturedTeam.Id);
+  // EXPECT_EQ(teamRequestBody.at("id").get<std::string>(), capturedTeam.Id);
   EXPECT_EQ(teamRequestBody.at("name").get<std::string>(), capturedTeam.Name);
 }
 
 TEST_F(TeamControllerTest, CreateTeam_Conflict) {
   EXPECT_CALL(*teamDelegateMock, CreateTeam(::testing::_))
     .WillOnce(testing::Return("new-id"))
-    .WillOnce(testing::Throw(std::runtime_error("duplicate key value")));
+    .WillOnce(testing::Throw(DuplicateException("A team with the same name already exists.")));
   
-  nlohmann::json team1RequestBody = {{"id", "id1"}, {"name", "new team"}};
+  nlohmann::json team1RequestBody = {{"name", "new team"}};  // ✅ Sin "id"
   crow::request teamRequest1;
   teamRequest1.body = team1RequestBody.dump();
 
-  nlohmann::json team2RequestBody = {{"id", "id2"}, {"name", "new team"}};
+  nlohmann::json team2RequestBody = {{"name", "new team"}};  // ✅ Sin "id"
   crow::request teamRequest2;
   teamRequest2.body = team2RequestBody.dump();
 
