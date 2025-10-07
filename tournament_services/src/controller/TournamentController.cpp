@@ -12,6 +12,7 @@
 #include "configuration/RouteDefinition.hpp"
 #include "exception/Duplicate.hpp"
 #include "exception/NotFound.hpp"
+#include "exception/InvalidFormat.hpp"
 #include <iostream>
 
 TournamentController::TournamentController(std::shared_ptr<ITournamentDelegate> delegate) : tournamentDelegate(std::move(delegate)) {}
@@ -109,6 +110,9 @@ crow::response TournamentController::updateTournament(const crow::request& reque
     catch (const NotFoundException& e) {
         response.code = crow::NOT_FOUND; 
         response.body = e.what();
+    } catch (const InvalidFormatException& e) {
+        response.code = crow::BAD_REQUEST;
+        response.body = e.what();
     }
     catch (const std::exception& e) {
         response.code = crow::INTERNAL_SERVER_ERROR;
@@ -118,8 +122,36 @@ crow::response TournamentController::updateTournament(const crow::request& reque
     return response;
 }
 
+crow::response TournamentController::deleteTournament(const std::string& tournamentId) const {
+  crow::response response;
+
+  if (!std::regex_match(tournamentId, ID_VALUE_TOURNAMENT)) {
+    response.code = crow::BAD_REQUEST;
+    response.body = "Invalid ID format";
+    return response;
+  }
+
+  try {
+    tournamentDelegate->DeleteTournament(tournamentId);
+    response.code = crow::NO_CONTENT;
+        
+  } catch (const NotFoundException& e) {
+    response.code = crow::NOT_FOUND;
+    response.body = e.what();
+  } catch (const InvalidFormatException& e) {
+    response.code = crow::BAD_REQUEST;
+    response.body = e.what();
+
+  } catch (const std::exception& e) {
+    response.code = crow::INTERNAL_SERVER_ERROR;
+    response.body = "Internal server error";
+  }
+
+  return response;
+}
+
 REGISTER_ROUTE(TournamentController, getTournament, "/tournaments/<string>", "GET"_method)
 REGISTER_ROUTE(TournamentController, updateTournament, "/tournaments/<string>", "PATCH"_method)
-//delete y modificar update
 REGISTER_ROUTE(TournamentController, CreateTournament, "/tournaments", "POST"_method)
 REGISTER_ROUTE(TournamentController, ReadAll, "/tournaments", "GET"_method)
+REGISTER_ROUTE(TournamentController, deleteTournament, "/tournaments/<string>", "DELETE"_method)

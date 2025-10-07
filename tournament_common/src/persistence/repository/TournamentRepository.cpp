@@ -102,23 +102,23 @@ std::string TournamentRepository::Update(const domain::Tournament &entity) {
 }
 
 void TournamentRepository::Delete(std::string id) {
-    // auto pooled = connectionProvider->Connection();
-    // const auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
+    auto pooled = connectionProvider->Connection();
+    auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
+    
+    pqxx::work tx(*(connection->connection));
+    try {
+        pqxx::result result = tx.exec(pqxx::prepped{"delete_tournament"}, id);
+        tx.commit();
 
-    // pqxx::work tx(*(connection->connection));
-    // try {
-    //     pqxx::result result = tx.exec(pqxx::prepped{"delete_tournament"}, id);
-    //     tx.commit();
-
-    //     if (result.affected_rows() == 0) {
-    //         throw NotFoundException("Tournament not found for deletion.");
-    //     }
-    // } catch (const pqxx::data_exception& e) {
-    //     if (e.sqlstate() == "22P02") {
-    //         throw NotFoundException("Invalid ID format.");
-    //     }
-    //     throw;
-    // }
+        if (result.affected_rows() == 0) {
+            throw NotFoundException("Tournament not found for deletion.");
+        }
+    } catch (const pqxx::data_exception& e) {
+        if (e.sqlstate() == "22P02") {
+            throw NotFoundException("Invalid ID format.");
+        }
+        throw;
+    }
 }
 
 std::vector<std::shared_ptr<domain::Tournament>> TournamentRepository::ReadAll() {

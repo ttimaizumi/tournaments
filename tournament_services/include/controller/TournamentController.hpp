@@ -21,9 +21,9 @@ public:
 
     [[nodiscard]] crow::response getTournament(const std::string& tournamentId) const;
     [[nodiscard]] crow::response updateTournament(const crow::request& request, const std::string& tournamentId) const;
-
     [[nodiscard]] crow::response CreateTournament(const crow::request &request) const;
     [[nodiscard]] crow::response ReadAll() const;
+    [[nodiscard]] crow::response deleteTournament(const std::string& tournamentId) const;
 };
 
 
