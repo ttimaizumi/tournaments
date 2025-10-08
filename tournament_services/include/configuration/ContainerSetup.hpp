@@ -24,7 +24,7 @@
 #include "cms/QueueMessageProducer.hpp"
 #include "cms/QueueResolver.hpp"
 #include "delegate/IGroupDelegate.hpp"
-#include "delegate/GroupDelegate.hpp"
+#include "../delegate/GroupDelegate.hpp"
 #include "controller/GroupController.hpp"
 
 namespace config {
