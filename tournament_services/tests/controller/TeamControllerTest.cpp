@@ -107,6 +107,36 @@ TEST_F(TeamControllerTest, UpdateTeamTest) {
     EXPECT_EQ("updated-id", capturedTeam.Id);
     EXPECT_EQ(teamRequestBody.at("name").get<std::string>(), capturedTeam.Name);
 }
+// busca todos equipos con lista de objetos HTTP 200
+TEST_F(TeamControllerTest, GetAllTeams_WithTeams_Returns200) {
+    std::vector<std::shared_ptr<domain::Team>> teams = {
+        std::make_shared<domain::Team>(domain::Team{"id-1", "Team 1"}),
+        std::make_shared<domain::Team>(domain::Team{"id-2", "Team 2"})
+    };
+
+    EXPECT_CALL(*teamDelegateMock, GetAllTeams())
+        .WillOnce(testing::Return(teams));
+
+    crow::response response = teamController->getAllTeams();
+
+    EXPECT_EQ(crow::OK, response.code);
+    auto jsonResponse = crow::json::load(response.body);
+    EXPECT_EQ(2, jsonResponse.size());
+}
+
+//busca todos equipos con lista vacia HTTP 200
+TEST_F(TeamControllerTest, GetAllTeams_EmptyList_Returns200) {
+    std::vector<std::shared_ptr<domain::Team>> emptyTeams;
+
+    EXPECT_CALL(*teamDelegateMock, GetAllTeams())
+        .WillOnce(testing::Return(emptyTeams));
+
+    crow::response response = teamController->getAllTeams();
+
+    EXPECT_EQ(crow::OK, response.code);
+    auto jsonResponse = crow::json::load(response.body);
+    EXPECT_EQ(0, jsonResponse.size());
+}
 
 TEST_F(TeamControllerTest, UpdateTeam_ErrorFormat) {
     crow::response badRequest = teamController->UpdateTeam("", crow::request{});
