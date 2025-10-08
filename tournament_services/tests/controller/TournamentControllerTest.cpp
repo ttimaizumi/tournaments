@@ -12,6 +12,9 @@ class TournamentDelegateMock : public ITournamentDelegate {
     MOCK_METHOD(std::vector<std::shared_ptr<domain::Tournament>>, ReadAll, (), (override));
     MOCK_METHOD(std::shared_ptr<domain::Tournament>, ReadById, (const std::string&), (override));
     MOCK_METHOD(void, Delete, (const std::string&), (override));
+    MOCK_METHOD(std::string_view, SaveTournament, (const domain::Tournament&), (override));
+    MOCK_METHOD(std::vector<std::shared_ptr<domain::Tournament>>, GetAllTournaments, (), (override));
+    MOCK_METHOD(std::string_view, UpdateTournament, (const domain::Tournament&), (override));
 };
 
 class TournamentControllerTest : public ::testing::Test{
