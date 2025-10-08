@@ -3,6 +3,8 @@ project(tournament_tests)
 set(TEST_SOURCES
         controller/TeamControllerTest.cpp
         controller/TournamentControllerTest.cpp
+        controller/GroupControllerTest.cpp
+        delegate/GroupDelegateTest.cpp
         ../src/controller/TeamController.cpp
         ../src/controller/TournamentController.cpp
 )

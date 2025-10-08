@@ -60,10 +60,43 @@ inline std::expected<std::shared_ptr<domain::Group>, std::string> GroupDelegate:
     }
 }
 inline std::expected<void, std::string> GroupDelegate::UpdateGroup(const std::string_view& tournamentId, const domain::Group& group) {
-    return std::unexpected("Not implemented");
+    auto tournament = tournamentRepository->ReadById(tournamentId.data());
+    if (tournament == nullptr) {
+        return std::unexpected("Tournament doesn't exist");
+    }
+
+    auto existingGroup = groupRepository->FindByTournamentIdAndGroupId(tournamentId, group.Id());
+    if (existingGroup == nullptr) {
+        return std::unexpected("Group doesn't exist");
+    }
+
+    domain::Group updatedGroup = group;
+    updatedGroup.TournamentId() = tournament->Id();
+
+    try {
+        groupRepository->Update(updatedGroup);
+        return {};
+    } catch (const std::exception& e) {
+        return std::unexpected("Error updating group");
+    }
 }
 inline std::expected<void, std::string> GroupDelegate::RemoveGroup(const std::string_view& tournamentId, const std::string_view& groupId) {
-    return std::unexpected("Not implemented");
+    auto tournament = tournamentRepository->ReadById(tournamentId.data());
+    if (tournament == nullptr) {
+        return std::unexpected("Tournament doesn't exist");
+    }
+
+    auto existingGroup = groupRepository->FindByTournamentIdAndGroupId(tournamentId, groupId);
+    if (existingGroup == nullptr) {
+        return std::unexpected("Group doesn't exist");
+    }
+
+    try {
+        groupRepository->Delete(groupId.data());
+        return {};
+    } catch (const std::exception& e) {
+        return std::unexpected("Error deleting group");
+    }
 }
 
 std::expected<void, std::string> GroupDelegate::UpdateTeams(const std::string_view& tournamentId, const std::string_view& groupId, const std::vector<domain::Team>& teams) {
