@@ -6,6 +6,9 @@
 #include "domain/Tournament.hpp"
 #include "domain/Group.hpp"
 #include "domain/Match.hpp"
+#include <regex>
+
+static const std::regex ID_VALUE("[A-Za-z0-9\\-]+");
 
 namespace domain {
 
@@ -47,8 +50,10 @@ namespace domain {
             return TournamentType::ROUND_ROBIN;
         if (type == "NFL")
             return TournamentType::NFL;
+        if (type == "MUNDIAL")
+            return TournamentType::MUNDIAL;
 
-        return TournamentType::ROUND_ROBIN;
+        return TournamentType::MUNDIAL;
     }
 
     inline void from_json(const nlohmann::json& json, TournamentFormat& format) {
@@ -69,8 +74,11 @@ namespace domain {
             case TournamentType::NFL:
                 json["type"] = "NFL";
                 break;
+            case TournamentType::MUNDIAL:
+                json["type"] = "MUNDIAL";
+                break;
             default:
-                json["type"] = "ROUND_ROBIN";
+                json["type"] = "MUNDIAL";
         }
     }
 

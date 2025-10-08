@@ -64,7 +64,7 @@ crow::response TeamController::UpdateTeam(const crow::request& request, const st
     domain::Team team = body;
     team.Id = teamId;
 
-    std::string updatedId = teamDelegate->UpdateTeam(team);
+    std::string updatedId(teamDelegate->UpdateTeam(team));
 
     crow::response response;
     response.code = crow::OK;

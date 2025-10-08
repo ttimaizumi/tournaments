@@ -9,7 +9,7 @@
 
 namespace domain {
     enum class TournamentType {
-        ROUND_ROBIN, NFL
+        ROUND_ROBIN, NFL, MUNDIAL
     };
 
     class TournamentFormat {
@@ -17,7 +17,7 @@ namespace domain {
         int maxTeamsPerGroup;
         TournamentType type;
     public:
-        TournamentFormat(int numberOfGroups = 1, int maxTeamsPerGroup = 16, TournamentType tournamentType = TournamentType::ROUND_ROBIN) {
+        TournamentFormat(int numberOfGroups = 8, int maxTeamsPerGroup = 4, TournamentType tournamentType = TournamentType::MUNDIAL) {
             this->numberOfGroups = numberOfGroups;
             this->maxTeamsPerGroup = maxTeamsPerGroup;
             this->type = tournamentType;

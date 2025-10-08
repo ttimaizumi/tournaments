@@ -71,7 +71,10 @@ public:
         nlohmann::json teamBody = entity;
 
         pqxx::work tx(*(connection->connection));
-        pqxx::result result = tx.exec(pqxx::prepped{"update_team"}, entity.Id, teamBody.dump());
+        pqxx::result result = tx.exec(
+            pqxx::prepped{"update_team"},
+            pqxx::params{entity.Id, teamBody.dump()}
+        );
         tx.commit();
 
         return result[0]["id"].c_str();
