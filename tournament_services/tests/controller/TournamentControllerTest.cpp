@@ -80,3 +80,62 @@ TEST_F(TournamentControllerTest, DeleteTournament_ErrorFormat) {
     badRequest = tournamentController->DeleteTournament("mfasd#*");
     EXPECT_EQ(badRequest.code, crow::BAD_REQUEST);
 }
+
+//crear torneo valido HTTP 201
+TEST_F(TournamentControllerTest, CreateTournament_ValidInput_Returns201) {
+    auto tournament = std::make_shared<domain::Tournament>("Mundial 2025");
+
+    EXPECT_CALL(*tournamentDelegateMock, CreateTournament(testing::_))
+        .WillOnce(testing::Return("new-tournament-id"));
+
+    nlohmann::json tournamentBody = {
+        {"name", "Mundial 2025"},
+        {"format", {
+            {"numberOfGroups", 8},
+            {"maxTeamsPerGroup", 4},
+            {"type", "MUNDIAL"}
+        }}
+    };
+    crow::request req;
+    req.body = tournamentBody.dump();
+
+    crow::response response = tournamentController->CreateTournament(req);
+
+    EXPECT_EQ(crow::CREATED, response.code);
+}
+
+//buscar todos torneos con lista HTTP 200
+TEST_F(TournamentControllerTest, ReadAll_WithTournaments_Returns200) {
+    std::vector<std::shared_ptr<domain::Tournament>> tournaments = {
+        std::make_shared<domain::Tournament>(domain::Tournament("Mundial 2025")),
+        std::make_shared<domain::Tournament>(domain::Tournament("Copa America"))
+    };
+
+    EXPECT_CALL(*tournamentDelegateMock, ReadAll())
+        .WillOnce(testing::Return(tournaments));
+
+    crow::response response = tournamentController->GetAllTournaments();
+
+    EXPECT_EQ(crow::OK, response.code);
+}
+
+//actualizar torneo valido HTTP 204
+TEST_F(TournamentControllerTest, UpdateTournament_ValidInput_Returns200) {
+    // Primero simular que el torneo existe
+    auto tournament = std::make_shared<domain::Tournament>("Mundial 2025");
+    tournament->Id() = "tournament-id";
+
+    EXPECT_CALL(*tournamentDelegateMock, ReadById(testing::Eq("tournament-id")))
+        .WillOnce(testing::Return(tournament));
+
+    EXPECT_CALL(*tournamentDelegateMock, CreateTournament(testing::_))
+        .WillOnce(testing::Return("tournament-id"));
+
+    nlohmann::json tournamentBody = {{"name", "Mundial 2026"}};
+    crow::request req;
+    req.body = tournamentBody.dump();
+
+    crow::response response = tournamentController->UpdateTournament("tournament-id", req);
+
+    EXPECT_EQ(crow::OK, response.code);
+}
