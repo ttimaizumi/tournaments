@@ -47,6 +47,8 @@ namespace domain {
             return TournamentType::ROUND_ROBIN;
         if (type == "NFL")
             return TournamentType::NFL;
+        if (type == "DOUBLE_ELIMINATION")
+            return TournamentType::DOUBLE_ELIMINATION;
 
         return TournamentType::ROUND_ROBIN;
     }
@@ -68,6 +70,9 @@ namespace domain {
                 break;
             case TournamentType::NFL:
                 json["type"] = "NFL";
+                break;
+            case TournamentType::DOUBLE_ELIMINATION:
+                json["type"] = "DOUBLE_ELIMINATION";
                 break;
             default:
                 json["type"] = "ROUND_ROBIN";

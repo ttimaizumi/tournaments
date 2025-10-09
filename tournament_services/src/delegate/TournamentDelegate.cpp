@@ -1,31 +1,48 @@
 //
 // Created by tomas on 8/31/25.
 //
+
+#include <string>
 #include <string_view>
 #include <memory>
+#include <utility>
 
 #include "delegate/TournamentDelegate.hpp"
 
-#include "persistence/repository/IRepository.hpp"
+// ctor
+TournamentDelegate::TournamentDelegate(
+        std::shared_ptr<IRepository<domain::Tournament, std::string>> repository,
+        std::shared_ptr<IQueueMessageProducer> producer)
+    : tournamentRepository(std::move(repository)), producer(std::move(producer)) {}
 
-TournamentDelegate::TournamentDelegate(std::shared_ptr<IRepository<domain::Tournament, std::string> > repository, std::shared_ptr<QueueMessageProducer> producer) : tournamentRepository(std::move(repository)), producer(std::move(producer)) {
-}
-
+// crea torneo y publica un mensaje
 std::string TournamentDelegate::CreateTournament(std::shared_ptr<domain::Tournament> tournament) {
-    //fill groups according to max groups
-    std::shared_ptr<domain::Tournament> tp = std::move(tournament);
-    // for (auto[i, g] = std::tuple{0, 'A'}; i < tp->Format().NumberOfGroups(); i++,g++) {
-    //     tp->Groups().push_back(domain::Group{std::format("Tournament {}", g)});
-    // }
-
+    auto tp = std::move(tournament);
     std::string id = tournamentRepository->Create(*tp);
-    producer->SendMessage(id, "tournament.created");
 
-    //if groups are completed also create matches
+    // Enviar mensaje solo si hay id y si el producer existe
+    if (!id.empty() && producer) {
+        producer->SendMessage(std::string_view{id}, std::string_view{"tournament.created"});
+    }
 
     return id;
 }
 
-std::vector<std::shared_ptr<domain::Tournament> > TournamentDelegate::ReadAll() {
+
+// lee todos
+std::vector<std::shared_ptr<domain::Tournament>> TournamentDelegate::ReadAll() {
     return tournamentRepository->ReadAll();
+}
+
+// leer por id
+std::shared_ptr<domain::Tournament> TournamentDelegate::ReadById(const std::string_view id) {
+    return tournamentRepository->ReadById(std::string{id});
+}
+
+// actualizar: valida existencia, llama Update y considera exito si Update regresa id no vacio
+bool TournamentDelegate::UpdateTournament(const domain::Tournament& t) {
+    auto existing = tournamentRepository->ReadById(t.Id());
+    if (!existing) return false;
+    auto updatedId = tournamentRepository->Update(t);
+    return !updatedId.empty();
 }

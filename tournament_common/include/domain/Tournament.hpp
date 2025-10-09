@@ -9,7 +9,7 @@
 
 namespace domain {
     enum class TournamentType {
-        ROUND_ROBIN, NFL
+        ROUND_ROBIN, NFL,DOUBLE_ELIMINATION
     };
 
     class TournamentFormat {
