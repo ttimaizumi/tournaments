@@ -2,6 +2,9 @@
 // Created by tsuny on 8/31/25.
 //
 
+#define JSON_CONTENT_TYPE "application/json"
+#define CONTENT_TYPE_HEADER "content-type"
+
 #include "configuration/RouteDefinition.hpp"
 #include "controller/TournamentController.hpp"
 
@@ -88,6 +91,7 @@ crow::response TournamentController::ReadAll() const {
     crow::response response;
     response.code = crow::OK;
     response.body = body.dump();
+    response.add_header(CONTENT_TYPE_HEADER, JSON_CONTENT_TYPE);
 
     return response;
 }

@@ -8,6 +8,9 @@
 #include "exception/Duplicate.hpp"
 #include "exception/NotFound.hpp"
 #include <memory.h>
+// #include <gtest/gtest.h>
+// #include "domain/Team.hpp"
+// #include "controller/TournamentController.hpp"
 
 class TournamentDelegateMock : public ITournamentDelegate {
 public:
@@ -255,3 +258,14 @@ TEST_F(TournamentControllerTest, UpdateTournament_IDMismatch) {
     EXPECT_EQ(crow::BAD_REQUEST, response.code);
     EXPECT_EQ("ID is not editable", response.body);
 }
+// TEST(TournamentControllerTest, CreateTournament) {
+// std::shared_ptr<TournamentController> tournamentController;
+// tournamentController->ReadAll();
+// std::string id = "ID";
+// std::string name = "Name";
+
+// domain::Team team = {id,name};
+
+// EXPECT_EQ(team.Id.c_str(), id);
+// EXPECT_EQ(team.Name.c_str(), name);
+// }

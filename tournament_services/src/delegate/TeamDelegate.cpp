@@ -18,7 +18,16 @@ std::shared_ptr<domain::Team> TeamDelegate::GetTeam(std::string_view id) {
 }
 
 std::string_view TeamDelegate::CreateTeam(const domain::Team& team){
+    if (!team.Id.empty()) {
+        throw std::invalid_argument("ID is not manually assignable");
+    }
     return teamRepository->Create(team);
 }
 
+std::string_view TeamDelegate::UpdateTeam(const domain::Team& team){
+    return teamRepository->Update(team);
+}
 
+void TeamDelegate::DeleteTeam(std::string_view id) {
+    teamRepository->Delete(id);
+}

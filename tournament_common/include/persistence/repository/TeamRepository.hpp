@@ -16,6 +16,7 @@ class TeamRepository : public IRepository<domain::Team, std::string_view> {
     std::shared_ptr<IDbConnectionProvider> connectionProvider;
 public:
 
+
     explicit TeamRepository(std::shared_ptr<IDbConnectionProvider> connectionProvider);
 
     std::vector<std::shared_ptr<domain::Team>> ReadAll() override;
