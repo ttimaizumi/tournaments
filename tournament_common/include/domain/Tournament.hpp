@@ -12,6 +12,7 @@ namespace domain {
         ROUND_ROBIN, NFL
     };
 
+
     class TournamentFormat {
         int numberOfGroups;
         int maxTeamsPerGroup;
