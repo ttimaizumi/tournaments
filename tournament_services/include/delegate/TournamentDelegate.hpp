@@ -19,8 +19,9 @@ class TournamentDelegate : public ITournamentDelegate {
 
 public:
     // constructor usando la interfaz del productor para facilitar tests
-    explicit TournamentDelegate(std::shared_ptr<IRepository<domain::Tournament, std::string>> repository,
-                                std::shared_ptr<IQueueMessageProducer> producer);
+    explicit TournamentDelegate(std::shared_ptr<IRepository<domain::Tournament, std::string>> repository
+        //,std::shared_ptr<IQueueMessageProducer> producer
+        );
 
     // crea torneo y publica evento
     std::string CreateTournament(std::shared_ptr<domain::Tournament> tournament) override;
