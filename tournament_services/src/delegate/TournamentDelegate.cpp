@@ -38,3 +38,7 @@ std::string TournamentDelegate::UpdateTournament(const domain::Tournament& tourn
 std::vector<std::shared_ptr<domain::Tournament> > TournamentDelegate::ReadAll() {
     return tournamentRepository->ReadAll();
 }
+
+void TournamentDelegate::DeleteTournament(std::string_view id) {
+    tournamentRepository->Delete(id.data());
+}

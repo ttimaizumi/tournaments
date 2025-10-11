@@ -118,6 +118,7 @@ TEST_F(TournamentControllerTest, CreateTournamentTest) {
             testing::Return("new-tournament-id")));
 
     nlohmann::json tournamentRequestBody = {
+            {"id", "new-id"},
         {"name", "Tournament1"}
     };
 

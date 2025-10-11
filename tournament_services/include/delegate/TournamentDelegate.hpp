@@ -22,6 +22,7 @@ public:
     std::vector<std::shared_ptr<domain::Tournament>> ReadAll() override;
 
     std::string UpdateTournament(const domain::Tournament& tournament) override;
+    void DeleteTournament(std::string_view id) override;
 };
 
 #endif //TOURNAMENTS_TOURNAMENTDELEGATE_HPP
