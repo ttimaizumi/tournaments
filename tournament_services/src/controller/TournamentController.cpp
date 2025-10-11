@@ -12,8 +12,10 @@
 #include "configuration/RouteDefinition.hpp"
 #include "exception/Duplicate.hpp"
 #include "exception/NotFound.hpp"
+
 #include "exception/InvalidFormat.hpp"
 #include <iostream>
+
 
 TournamentController::TournamentController(std::shared_ptr<ITournamentDelegate> delegate) : tournamentDelegate(std::move(delegate)) {}
 
@@ -26,23 +28,23 @@ crow::response TournamentController::getTournament(const std::string& tournament
 
     try {
         auto tournament = tournamentDelegate->GetTournament(tournamentId);
+        if(tournament == nullptr)
+        {
+            return crow::response{crow::NOT_FOUND, "Tournament not found"};
+        }
+
         nlohmann::json body = tournament;
         auto response = crow::response{crow::OK, body.dump()};
         response.add_header("Content-Type", "application/json");
         return response;
     }
-    catch (const NotFoundException& e) {
-        return crow::response{crow::NOT_FOUND, e.what()};
-
-    } catch (const InvalidFormatException& e) {
-        return crow::response{crow::BAD_REQUEST, e.what()};
-
-    } catch (const std::exception& e)
-    {
+    // catch (const InvalidFormat& e) {
+    //     return crow::response{crow::BAD_REQUEST, e.what()};}
+    catch (const std::exception& e) {
         return crow::response{crow::INTERNAL_SERVER_ERROR, "Internal server error"};
     }
-
 }
+
 
 crow::response TournamentController::CreateTournament(const crow::request &request) const {
     crow::response response;
@@ -53,11 +55,23 @@ crow::response TournamentController::CreateTournament(const crow::request &reque
     auto requestBody = nlohmann::json::parse(request.body);
     domain::Tournament tournament;
 
+    if (requestBody.contains("name")) {
+        tournament.Name() = requestBody["name"].get<std::string>();
+    }
+
     try {
         auto createdId = tournamentDelegate->CreateTournament(tournament);
         response.code = crow::CREATED;
         response.body = createdId;
-    } catch (const DuplicateException& e) {
+        nlohmann::json body = tournament;
+        response.code = crow::CREATED;
+        response.body = body.dump();
+        response.add_header("Content-Type", "application/json");
+    }catch (const std::invalid_argument& e) {
+        response.code = crow::BAD_REQUEST;
+        response.body = e.what();
+
+    }catch (const DuplicateException& e) {
         response.code = crow::CONFLICT;
         response.body = e.what();
     }catch (const std::exception& e) {
@@ -118,9 +132,6 @@ crow::response TournamentController::updateTournament(const crow::request& reque
     catch (const NotFoundException& e) {
         response.code = crow::NOT_FOUND;
         response.body = e.what();
-    } catch (const InvalidFormatException& e) {
-        response.code = crow::BAD_REQUEST;
-        response.body = e.what();
     }
     catch (const std::exception& e) {
         response.code = crow::INTERNAL_SERVER_ERROR;
@@ -130,36 +141,8 @@ crow::response TournamentController::updateTournament(const crow::request& reque
     return response;
 }
 
-crow::response TournamentController::deleteTournament(const std::string& tournamentId) const {
-  crow::response response;
-
-  if (!std::regex_match(tournamentId, ID_VALUE_TOURNAMENT)) {
-    response.code = crow::BAD_REQUEST;
-    response.body = "Invalid ID format";
-    return response;
-  }
-
-  try {
-    tournamentDelegate->DeleteTournament(tournamentId);
-    response.code = crow::NO_CONTENT;
-        
-  } catch (const NotFoundException& e) {
-    response.code = crow::NOT_FOUND;
-    response.body = e.what();
-  } catch (const InvalidFormatException& e) {
-    response.code = crow::BAD_REQUEST;
-    response.body = e.what();
-
-  } catch (const std::exception& e) {
-    response.code = crow::INTERNAL_SERVER_ERROR;
-    response.body = "Internal server error";
-  }
-
-  return response;
-}
-
 REGISTER_ROUTE(TournamentController, getTournament, "/tournaments/<string>", "GET"_method)
 REGISTER_ROUTE(TournamentController, updateTournament, "/tournaments/<string>", "PATCH"_method)
+//delete y modificar update
 REGISTER_ROUTE(TournamentController, CreateTournament, "/tournaments", "POST"_method)
 REGISTER_ROUTE(TournamentController, ReadAll, "/tournaments", "GET"_method)
-REGISTER_ROUTE(TournamentController, deleteTournament, "/tournaments/<string>", "DELETE"_method)
