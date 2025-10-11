@@ -91,23 +91,39 @@ crow::response TournamentController::ReadById(const std::string& id) const {
 }
 
 // PUT /tournaments
-crow::response TournamentController::UpdateTournament(const crow::request& request) const {
+crow::response TournamentController::UpdateTournament(const crow::request& request, const std::string& id) const {
     crow::response response;
+
+    if (!std::regex_match(id, kIdPattern)) {
+        return crow::response{crow::BAD_REQUEST, "Invalid ID format"};
+    }
 
     if (!json::accept(request.body)) {
         response.code = crow::BAD_REQUEST;
+        response.body = "invalid json";
         return response;
     }
 
     json body = json::parse(request.body);
-    domain::Tournament t = body.get<domain::Tournament>();
+    if (!body.contains("name") || !body["name"].is_string()) {
+        response.code = crow::BAD_REQUEST;
+        response.body = "field 'name' is required and must be string";
+        return response;
+    }
 
-    const bool ok = tournamentDelegate->UpdateTournament(t);
-    response.code = ok ? crow::NO_CONTENT : crow::NOT_FOUND;
+    auto existing = tournamentDelegate->ReadById(id);
+    if (!existing) {
+        return crow::response{crow::NOT_FOUND, "tournament not found"};
+    }
+
+    existing->Name() = body["name"].get<std::string>();
+
+    const bool ok = tournamentDelegate->UpdateTournament(*existing);
+    response.code = ok ? crow::NO_CONTENT : crow::INTERNAL_SERVER_ERROR;
     return response;
 }
 
 REGISTER_ROUTE(TournamentController, CreateTournament, "/tournaments", "POST"_method)
 REGISTER_ROUTE(TournamentController, ReadAll,          "/tournaments", "GET"_method)
 REGISTER_ROUTE(TournamentController, ReadById,         "/tournaments/<string>", "GET"_method)
-REGISTER_ROUTE(TournamentController, UpdateTournament, "/tournaments", "PUT"_method)
+REGISTER_ROUTE(TournamentController, UpdateTournament, "/tournaments/<string>", "PATCH"_method)
