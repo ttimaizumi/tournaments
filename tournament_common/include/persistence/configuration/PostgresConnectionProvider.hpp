@@ -24,6 +24,8 @@ public:
             connectionPool.push(std::make_unique<pqxx::connection>(connectionString.data()));
             connectionPool.back()->prepare("insert_tournament", "insert into TOURNAMENTS (document) values($1) RETURNING id");
             connectionPool.back()->prepare("select_tournament_by_id", "select * from TOURNAMENTS where id = $1");
+            connectionPool.back()->prepare("update_tournament", "UPDATE TOURNAMENTS SET document = document || $1::jsonb WHERE id = $2 RETURNING document");
+            connectionPool.back()->prepare("delete_tournament", "DELETE FROM TOURNAMENTS WHERE id = $1");
             connectionPool.back()->prepare("insert_team", "insert into TEAMS (document) values($1) RETURNING id");
             connectionPool.back()->prepare("select_team_by_id", "select * from TEAMS where id = $1");
             connectionPool.back()->prepare("update_team", "UPDATE TEAMS SET document = document || $1::jsonb WHERE id = $2 RETURNING document");
