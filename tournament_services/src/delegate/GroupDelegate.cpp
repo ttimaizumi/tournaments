@@ -1,10 +1,25 @@
 #include "delegate/GroupDelegate.hpp"
+#include "exception/NotFound.hpp"
+#include "exception/InvalidFormat.hpp"
 
 #include <utility>
 #include <sstream>
 
 GroupDelegate::GroupDelegate(const std::shared_ptr<TournamentRepository>& tournamentRepository, const std::shared_ptr<IGroupRepository>& groupRepository, const std::shared_ptr<TeamRepository>& teamRepository)
     : tournamentRepository(tournamentRepository), groupRepository(groupRepository), teamRepository(teamRepository){}
+
+std::expected<std::vector<std::shared_ptr<domain::Group>>, std::string> GroupDelegate::GetGroups(const std::string_view& tournamentId) {
+    try {
+        tournamentRepository->ReadById(tournamentId.data());
+        return this->groupRepository->FindByTournamentId(tournamentId);
+    } catch (const NotFoundException& e) {
+        throw; 
+    } catch (const InvalidFormatException& e) {
+        throw;
+    } catch (const std::exception& e) {
+        return std::unexpected("Error when reading to DB.");
+    }
+}
 
 std::expected<std::string, std::string> GroupDelegate::CreateGroup(const std::string_view& tournamentId, const domain::Group& group) {
     auto tournament = tournamentRepository->ReadById(tournamentId.data());
@@ -25,13 +40,6 @@ std::expected<std::string, std::string> GroupDelegate::CreateGroup(const std::st
     return id;
 }
 
-std::expected<std::vector<std::shared_ptr<domain::Group>>, std::string> GroupDelegate::GetGroups(const std::string_view& tournamentId) {
-    try {
-        return this->groupRepository->FindByTournamentId(tournamentId);
-    } catch (const std::exception& e) {
-        return std::unexpected("Error when reading to DB");
-    }
-}
 std::expected<std::shared_ptr<domain::Group>, std::string> GroupDelegate::GetGroup(const std::string_view& tournamentId, const std::string_view& groupId) {
     try {
         return groupRepository->FindByTournamentIdAndGroupId(tournamentId, groupId);

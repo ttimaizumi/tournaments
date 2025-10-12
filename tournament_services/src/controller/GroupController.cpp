@@ -18,14 +18,26 @@ GroupController::~GroupController()
 }
 
 crow::response GroupController::GetGroups(const std::string& tournamentId){
-    if (auto groups = this->groupDelegate->GetGroups(tournamentId)) {
-        const nlohmann::json body = *groups;
-        crow::response response{crow::OK, body.dump()};
-        response.add_header(CONTENT_TYPE_HEADER, JSON_CONTENT_TYPE);
-        return response;
+    if (!std::regex_match(tournamentId, ID_GROUPVALUE)) {
+        return crow::response{crow::BAD_REQUEST, "Invalid tournament ID format"};
     }
-    return crow::response{crow::INTERNAL_SERVER_ERROR};
+    try {
+        auto groups = this->groupDelegate->GetGroups(tournamentId);
+        if (groups) {
+            const nlohmann::json body = *groups;
+            crow::response response{crow::OK, body.dump()};
+            response.add_header(CONTENT_TYPE_HEADER, JSON_CONTENT_TYPE);
+            return response;
+        } else {
+            return crow::response{crow::INTERNAL_SERVER_ERROR, groups.error()};
+        }
+    } catch (const NotFoundException& e) {
+        return crow::response{crow::NOT_FOUND, e.what()};
+    } catch (const InvalidFormatException& e) {
+        return crow::response{crow::BAD_REQUEST, e.what()};
+    }
 }
+
 crow::response GroupController::GetGroup(const std::string& tournamentId, const std::string& groupId){
     if (auto group = this->groupDelegate->GetGroup(tournamentId, groupId)) {
         const nlohmann::json body = *group;

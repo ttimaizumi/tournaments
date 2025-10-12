@@ -15,6 +15,7 @@
 #include "domain/Group.hpp"
 #include "domain/Utilities.hpp"
 
+static const std::regex ID_GROUPVALUE("[A-Za-z0-9\\-]+");
 
 class GroupController
 {

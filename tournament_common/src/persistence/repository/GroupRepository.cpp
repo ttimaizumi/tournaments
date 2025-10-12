@@ -5,7 +5,37 @@
 #include "domain/Utilities.hpp"
 #include  "persistence/repository/GroupRepository.hpp"
 
+#include "exception/NotFound.hpp"
+#include "exception/InvalidFormat.hpp"
+
 GroupRepository::GroupRepository(const std::shared_ptr<IDbConnectionProvider>& connectionProvider) : connectionProvider(std::move(connectionProvider)) {}
+
+std::vector<std::shared_ptr<domain::Group>> GroupRepository::FindByTournamentId(const std::string_view& tournamentId) {
+    auto pooled = connectionProvider->Connection();
+    auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
+
+    pqxx::work tx(*(connection->connection));
+    try {
+        pqxx::result result = tx.exec(pqxx::prepped{"select_groups_by_tournament"}, pqxx::params{tournamentId.data()});
+        tx.commit();
+
+    std::vector<std::shared_ptr<domain::Group>> groups;
+    for(auto row : result){
+        nlohmann::json groupDocument = nlohmann::json::parse(row["document"].c_str());
+        auto group = std::make_shared<domain::Group>(groupDocument);
+        group->Id() = result[0]["id"].c_str();
+
+        groups.push_back(group);
+    }
+    return groups;
+    } catch (const pqxx::data_exception& e) {
+        // Handle invalid UUID format
+        if (e.sqlstate() == "22P02") {
+            throw InvalidFormatException("Invalid ID format.");
+        }
+        throw;
+    }
+}
 
 std::shared_ptr<domain::Group> GroupRepository::ReadById(std::string id) {
     return std::make_shared<domain::Group>();
@@ -56,26 +86,6 @@ std::vector<std::shared_ptr<domain::Group>> GroupRepository::ReadAll() {
     }
 
     return teams;
-}
-
-std::vector<std::shared_ptr<domain::Group>> GroupRepository::FindByTournamentId(const std::string_view& tournamentId) {
-    auto pooled = connectionProvider->Connection();
-    auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
-
-    pqxx::work tx(*(connection->connection));
-    pqxx::result result = tx.exec(pqxx::prepped{"select_groups_by_tournament"}, pqxx::params{tournamentId.data()});
-    tx.commit();
-
-    std::vector<std::shared_ptr<domain::Group>> groups;
-    for(auto row : result){
-        nlohmann::json groupDocument = nlohmann::json::parse(row["document"].c_str());
-        auto group = std::make_shared<domain::Group>(groupDocument);
-        group->Id() = result[0]["id"].c_str();
-
-        groups.push_back(group);
-    }
-
-    return groups;
 }
 
 std::shared_ptr<domain::Group> GroupRepository::FindByTournamentIdAndGroupId(const std::string_view& tournamentId, const std::string_view& groupId) {
