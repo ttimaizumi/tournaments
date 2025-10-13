@@ -151,8 +151,6 @@ std::shared_ptr<domain::Group> GroupRepository::FindByTournamentIdAndGroupId(con
             throw InvalidFormatException("Invalid group ID format.");
         }
         throw;
-    } catch (const std::exception& e) {
-        return nullptr;
     }
 }
 

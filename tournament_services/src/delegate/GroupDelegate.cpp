@@ -22,6 +22,19 @@ std::expected<std::vector<std::shared_ptr<domain::Group>>, std::string> GroupDel
     }
 }
 
+std::expected<std::shared_ptr<domain::Group>, std::string> GroupDelegate::GetGroup(const std::string_view& tournamentId, const std::string_view& groupId) {
+    try {
+        tournamentRepository->ReadById(tournamentId.data());
+        return groupRepository->FindByTournamentIdAndGroupId(tournamentId, groupId);
+    } catch (const NotFoundException& e) {
+        throw;
+    } catch (const InvalidFormatException& e) {
+        throw;
+    } catch (const std::exception& e) {
+        return std::unexpected("Error when reading to DB");
+    }
+}
+
 std::expected<std::string, std::string> GroupDelegate::CreateGroup(const std::string_view& tournamentId, const domain::Group& group) {
     try {
         tournamentRepository->ReadById(tournamentId.data());
@@ -44,13 +57,6 @@ std::expected<std::string, std::string> GroupDelegate::CreateGroup(const std::st
     }
 }
 
-std::expected<std::shared_ptr<domain::Group>, std::string> GroupDelegate::GetGroup(const std::string_view& tournamentId, const std::string_view& groupId) {
-    try {
-        return groupRepository->FindByTournamentIdAndGroupId(tournamentId, groupId);
-    } catch (const std::exception& e) {
-        return std::unexpected("Error when reading to DB");
-    }
-}
 std::expected<void, std::string> GroupDelegate::UpdateGroup(const std::string_view& tournamentId, const domain::Group& group, const std::string_view& groupId) {
     try {
         tournamentRepository->ReadById(tournamentId.data());
@@ -76,7 +82,7 @@ std::expected<void, std::string> GroupDelegate::RemoveGroup(const std::string_vi
         tournamentRepository->ReadById(tournamentId.data());
         groupRepository->FindByTournamentIdAndGroupId(tournamentId, groupId);
         groupRepository->Delete(groupId.data());
-        
+
         return {};
     } catch (const NotFoundException& e) {
         throw;
