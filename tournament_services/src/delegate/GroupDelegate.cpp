@@ -72,8 +72,19 @@ std::expected<void, std::string> GroupDelegate::UpdateGroup(const std::string_vi
     }
 }
 std::expected<void, std::string> GroupDelegate::RemoveGroup(const std::string_view& tournamentId, const std::string_view& groupId) {
-    //Falta implementar
-    return std::unexpected("Not implemented");
+    try {
+        tournamentRepository->ReadById(tournamentId.data());
+        groupRepository->FindByTournamentIdAndGroupId(tournamentId, groupId);
+        groupRepository->Delete(groupId.data());
+        
+        return {};
+    } catch (const NotFoundException& e) {
+        throw;
+    } catch (const InvalidFormatException& e) {
+        throw;
+    } catch (const std::exception& e) {
+        return std::unexpected("Error deleting group: " + std::string(e.what()));
+    }
 }
 
 std::expected<void, std::string> GroupDelegate::UpdateTeams(const std::string_view& tournamentId, const std::string_view& groupId, const std::vector<domain::Team>& teams) {

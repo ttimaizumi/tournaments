@@ -92,7 +92,24 @@ std::string GroupRepository::Update (const domain::Group & entity) {
 }
 
 void GroupRepository::Delete(std::string id) {
+    auto pooled = connectionProvider->Connection();
+    auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
 
+    pqxx::work tx(*(connection->connection));
+    try {
+        pqxx::result result = tx.exec(pqxx::prepped{"delete_group"}, pqxx::params{id});
+        tx.commit();
+
+        if (result.empty()) {
+            throw NotFoundException("Group not found for deletion.");
+        }
+    } catch (const pqxx::data_exception& e) {
+        // Handle invalid UUID format
+        if (e.sqlstate() == "22P02") {
+            throw InvalidFormatException("Invalid group ID format.");
+        }
+        throw;
+    }
 }
 
 std::vector<std::shared_ptr<domain::Group>> GroupRepository::ReadAll() {

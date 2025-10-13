@@ -48,6 +48,7 @@ public:
                     last_update_date = CURRENT_TIMESTAMP
                 where id = $1
             )");
+            connectionPool.back()->prepare("delete_group", "DELETE FROM GROUPS WHERE id = $1 RETURNING id");
         }
     }
 

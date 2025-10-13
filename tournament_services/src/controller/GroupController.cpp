@@ -116,8 +116,30 @@ crow::response GroupController::UpdateTeams(const crow::request& request, const 
 
     return crow::response{422, result.error()};
 }
+
+crow::response GroupController::RemoveGroup(const std::string& tournamentId, const std::string& groupId) {
+    if (!std::regex_match(tournamentId, ID_GROUPVALUE)) {
+        return crow::response{crow::BAD_REQUEST, "Invalid tournament ID format. Must be a valid UUID."};
+    }
+    if (!std::regex_match(groupId, ID_GROUPVALUE)) {
+        return crow::response{crow::BAD_REQUEST, "Invalid group ID format. Must be a valid UUID."};
+    }
+
+    try {
+        groupDelegate->RemoveGroup(tournamentId, groupId);
+        return crow::response{crow::NO_CONTENT};
+    } catch (const NotFoundException& e) {
+        return crow::response{crow::NOT_FOUND, e.what()};
+    } catch (const InvalidFormatException& e) {
+        return crow::response{crow::BAD_REQUEST, e.what()};
+    } catch (const std::exception& e) {
+        return crow::response{crow::INTERNAL_SERVER_ERROR, e.what()};
+    }
+}
+
 REGISTER_ROUTE(GroupController, GetGroups, "/tournaments/<string>/groups", "GET"_method) 
-REGISTER_ROUTE(GroupController, GetGroup, "/tournaments/<string>/groups/<string>", "GET"_method) //?
+REGISTER_ROUTE(GroupController, GetGroup, "/tournaments/<string>/groups/<string>", "GET"_method)
 REGISTER_ROUTE(GroupController, CreateGroup, "/tournaments/<string>/groups", "POST"_method)
 REGISTER_ROUTE(GroupController, UpdateGroup, "/tournaments/<string>/groups/<string>", "PATCH"_method)
 REGISTER_ROUTE(GroupController, UpdateTeams, "/tournaments/<string>/groups/<string>/teams", "PATCH"_method)
+REGISTER_ROUTE(GroupController, RemoveGroup, "/tournaments/<string>/groups/<string>", "DELETE"_method)
