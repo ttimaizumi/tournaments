@@ -53,7 +53,6 @@ crow::response GroupController::CreateGroup(const crow::request& request, const 
     if (!std::regex_match(tournamentId, ID_GROUPVALUE)) {
         return crow::response{crow::BAD_REQUEST, "Invalid tournament ID format. Must be a valid UUID."};
     }
-    
     try {
         auto requestBody = nlohmann::json::parse(request.body);
         domain::Group group = requestBody;
@@ -80,8 +79,32 @@ crow::response GroupController::CreateGroup(const crow::request& request, const 
     }
 }
 
-crow::response GroupController::UpdateGroup(const crow::request& request){
-    return crow::response{crow::NOT_IMPLEMENTED};
+crow::response GroupController::UpdateGroup(const crow::request& request, const std::string& tournamentId, const std::string& groupId) {
+    if (!std::regex_match(tournamentId, ID_GROUPVALUE)) {
+        return crow::response{crow::BAD_REQUEST, "Invalid tournament ID format. Must be a valid UUID."};
+    }
+    if (!std::regex_match(groupId, ID_GROUPVALUE)) {
+        return crow::response{crow::BAD_REQUEST, "Invalid group ID format. Must be a valid UUID."};
+    }
+    try {
+        domain::Group group = nlohmann::json::parse(request.body);
+        
+        auto result = groupDelegate->UpdateGroup(tournamentId, group, groupId);
+        
+        if (result.has_value()) {
+            return crow::response{crow::NO_CONTENT}; // 204 No Content for successful update
+        } else {
+            return crow::response{crow::INTERNAL_SERVER_ERROR, result.error()};
+        }
+    } catch (const NotFoundException& e) {
+        return crow::response{crow::NOT_FOUND, e.what()};
+    } catch (const InvalidFormatException& e) {
+        return crow::response{crow::BAD_REQUEST, e.what()};
+    } catch (const DuplicateException& e) {
+        return crow::response{crow::CONFLICT, e.what()};
+    } catch (const nlohmann::json::parse_error& e) {
+        return crow::response{crow::BAD_REQUEST, "Invalid JSON in request body"};
+    }
 }
 
 crow::response GroupController::UpdateTeams(const crow::request& request, const std::string& tournamentId, const std::string& groupId) {

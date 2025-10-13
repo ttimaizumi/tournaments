@@ -26,7 +26,7 @@ public:
     crow::response GetGroups(const std::string& tournamentId);
     crow::response GetGroup(const std::string& tournamentId, const std::string& groupId);
     crow::response CreateGroup(const crow::request& request, const std::string& tournamentId);
-    crow::response UpdateGroup(const crow::request& request);
+    crow::response UpdateGroup(const crow::request& request, const std::string& tournamentId, const std::string& groupId);
     crow::response UpdateTeams(const crow::request& request, const std::string& tournamentId, const std::string& groupId);
     //Delete group?
 };
