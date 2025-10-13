@@ -1,6 +1,7 @@
 #include "delegate/GroupDelegate.hpp"
 #include "exception/NotFound.hpp"
 #include "exception/InvalidFormat.hpp"
+#include "exception/Duplicate.hpp"
 
 #include <utility>
 #include <sstream>
@@ -22,22 +23,25 @@ std::expected<std::vector<std::shared_ptr<domain::Group>>, std::string> GroupDel
 }
 
 std::expected<std::string, std::string> GroupDelegate::CreateGroup(const std::string_view& tournamentId, const domain::Group& group) {
-    auto tournament = tournamentRepository->ReadById(tournamentId.data());
-    if (tournament == nullptr) {
-        return std::unexpected("Tournament doesn't exist");
-    }
-    domain::Group g = group;
-    g.TournamentId() = tournament->Id();
-    if (!g.Teams().empty()) {
-        for (auto& t : g.Teams()) {
-            auto team = teamRepository->ReadById(t.Id);
-            if (team == nullptr) {
-                return std::unexpected("Team doesn't exist");
+    try {
+        tournamentRepository->ReadById(tournamentId.data());
+        domain::Group g = group;
+        g.TournamentId() = tournamentId.data();
+        if (!g.Teams().empty()) {
+            for (auto& t : g.Teams()) {
+                teamRepository->ReadById(t.Id);
             }
         }
+        return this->groupRepository->Create(g);
+    } catch (const NotFoundException& e) {
+        throw;
+    } catch (const InvalidFormatException& e) {
+        throw;
+    } catch (const DuplicateException& e) {
+        throw;
+    } catch (const std::exception& e) {
+        return std::unexpected("Error creating group: " + std::string(e.what()));
     }
-    auto id = groupRepository->Create(g);
-    return id;
 }
 
 std::expected<std::shared_ptr<domain::Group>, std::string> GroupDelegate::GetGroup(const std::string_view& tournamentId, const std::string_view& groupId) {

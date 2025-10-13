@@ -7,6 +7,7 @@
 
 #include "exception/NotFound.hpp"
 #include "exception/InvalidFormat.hpp"
+#include "exception/Duplicate.hpp"
 
 GroupRepository::GroupRepository(const std::shared_ptr<IDbConnectionProvider>& connectionProvider) : connectionProvider(std::move(connectionProvider)) {}
 
@@ -23,7 +24,7 @@ std::vector<std::shared_ptr<domain::Group>> GroupRepository::FindByTournamentId(
     for(auto row : result){
         nlohmann::json groupDocument = nlohmann::json::parse(row["document"].c_str());
         auto group = std::make_shared<domain::Group>(groupDocument);
-        group->Id() = result[0]["id"].c_str();
+        group->Id() = row["id"].c_str();
 
         groups.push_back(group);
     }
@@ -47,11 +48,19 @@ std::string GroupRepository::Create (const domain::Group & entity) {
     nlohmann::json groupBody = entity;
 
     pqxx::work tx(*(connection->connection));
+    try {
     pqxx::result result = tx.exec(pqxx::prepped{"insert_group"}, pqxx::params{entity.TournamentId(), groupBody.dump()});
-
     tx.commit();
-
+    if (result.empty()) {
+        throw std::runtime_error("Failed to insert group.");
+    }
     return result[0]["id"].c_str();
+    } catch (const pqxx::unique_violation& e) {
+        if (e.sqlstate() == "23505") {
+            throw DuplicateException("A group with the same name already exists in this tournament.");
+        }
+        throw;
+    }
 }
 
 std::string GroupRepository::Update (const domain::Group & entity) {
