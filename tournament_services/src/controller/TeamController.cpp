@@ -71,20 +71,28 @@ crow::response TeamController::SaveTeam(const crow::request& request) const {
     return response;
 }
 
-// PUT /teams
+// PATCH /teams
 // - transforma JSON -> domain::Team
 // - delega en UpdateTeam
 // - 204 si actualizo, 404 si no encontro el ID
 // - 400 si el cuerpo no es JSON valido
-crow::response TeamController::UpdateTeam(const crow::request& request) const {
+crow::response TeamController::UpdateTeam(const crow::request& request, const std::string& id) const {
     crow::response response;
+
+    // validate id format
+    if (!std::regex_match(id, ID_VALUE)) {
+        return crow::response{crow::BAD_REQUEST, "Invalid ID format"};
+    }
 
     if (!nlohmann::json::accept(request.body)) {
         response.code = crow::BAD_REQUEST;
         return response;
     }
+
     auto body = nlohmann::json::parse(request.body);
     domain::Team team = body;
+    // ensure the id comes from the route (predefined) — overrides any id in body
+    team.Id = id;
 
     const bool updated = teamDelegate->UpdateTeam(team);
     response.code = updated ? crow::NO_CONTENT : crow::NOT_FOUND;
@@ -94,4 +102,4 @@ crow::response TeamController::UpdateTeam(const crow::request& request) const {
 REGISTER_ROUTE(TeamController, getTeam, "/teams/<string>", "GET"_method)
 REGISTER_ROUTE(TeamController, getAllTeams, "/teams", "GET"_method)
 REGISTER_ROUTE(TeamController, SaveTeam, "/teams", "POST"_method)
-REGISTER_ROUTE(TeamController, UpdateTeam, "/teams", "PUT"_method)
+REGISTER_ROUTE(TeamController, UpdateTeam, "/teams/<string>", "PATCH"_method)

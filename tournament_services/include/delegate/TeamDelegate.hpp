@@ -28,7 +28,7 @@ public:
     bool UpdateTeam(const domain::Team& team) override;
     // variantes con std::expected para cumplir requisitos
     std::expected<std::string, std::string> SaveTeamEx(const domain::Team& team);
-    std::expected<void, std::string>        UpdateTeamEx(const domain::Team& team);
+    std::expected<void, std::string> UpdateTeamEx(const domain::Team& team);
 };
 
 #endif // RESTAPI_TESTDELEGATE_HPP
