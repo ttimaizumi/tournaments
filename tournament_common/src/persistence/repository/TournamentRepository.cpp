@@ -40,6 +40,9 @@ std::shared_ptr<domain::Tournament> TournamentRepository::ReadById(std::string i
         // Handle invalid UUID format
         if (e.sqlstate() == "22P02") {
             throw InvalidFormatException("Invalid ID format.");
+
+            throw InvalidFormatException("Invalid ID format 123");
+
         }
         throw;
     }
