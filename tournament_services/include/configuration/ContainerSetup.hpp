@@ -48,7 +48,7 @@ namespace config {
             })
             .singleInstance();
 
-        builder.registerType<QueueMessageProducer>().named("tournamentAddTeamQueue");
+        builder.registerType<QueueMessageProducer>().as<IQueueMessageProducer>().named("tournamentAddTeamQueue");
         builder.registerType<QueueResolver>().as<IResolver<IQueueMessageProducer> >().named("queueResolver").
                 singleInstance();
 
@@ -66,7 +66,11 @@ namespace config {
                 .singleInstance();
         builder.registerType<TournamentController>().singleInstance();
 
-        builder.registerType<GroupDelegate>().as<IGroupDelegate>().singleInstance();
+        builder.registerType<GroupDelegate>().as<IGroupDelegate>()
+            .with<IQueueMessageProducer>([](Hypodermic::ComponentContext& context){
+                return context.resolveNamed<QueueMessageProducer>("tournamentAddTeamQueue");
+            })
+            .singleInstance();
         builder.registerType<GroupController>().singleInstance();
 
         return builder.build();

@@ -26,7 +26,7 @@ public:
     crow::response GetGroup(const std::string& tournamentId, const std::string& groupId);
     crow::response CreateGroup(const crow::request& request, const std::string& tournamentId);
     crow::response UpdateGroup(const crow::request& request);
-    crow::response UpdateTeams(const crow::request& request, const std::string& tournamentId, const std::string& groupId);
+    crow::response AddTeams(const crow::request& request, const std::string& tournamentId, const std::string& groupId);
 };
 
 GroupController::GroupController(const std::shared_ptr<IGroupDelegate>& delegate) : groupDelegate(std::move(delegate)) {}
@@ -63,6 +63,7 @@ crow::response GroupController::CreateGroup(const crow::request& request, const 
         response.add_header("location", *groupId);
         response.code = crow::CREATED;
     } else {
+        groupId.error();
         response.code = 422;
     }
 
@@ -73,7 +74,7 @@ crow::response GroupController::UpdateGroup(const crow::request& request){
     return crow::response{crow::NOT_IMPLEMENTED};
 }
 
-crow::response GroupController::UpdateTeams(const crow::request& request, const std::string& tournamentId, const std::string& groupId) {
+crow::response GroupController::AddTeams(const crow::request& request, const std::string& tournamentId, const std::string& groupId) {
     const std::vector<domain::Team> teams = nlohmann::json::parse(request.body);
     const auto result = groupDelegate->UpdateTeams(tournamentId, groupId, teams);
     if (result) {
@@ -86,6 +87,6 @@ REGISTER_ROUTE(GroupController, GetGroups, "/tournaments/<string>/groups", "GET"
 REGISTER_ROUTE(GroupController, GetGroup, "/tournaments/<string>/groups/<string>", "GET"_method)
 REGISTER_ROUTE(GroupController, CreateGroup, "/tournaments/<string>/groups", "POST"_method)
 REGISTER_ROUTE(GroupController, UpdateGroup, "/tournaments/<string>/groups/<string>", "PATCH"_method)
-REGISTER_ROUTE(GroupController, UpdateTeams, "/tournaments/<string>/groups/<string>/teams", "PATCH"_method)
+REGISTER_ROUTE(GroupController, AddTeams, "/tournaments/<string>/groups/<string>/teams", "PATCH"_method)
 
 #endif /* A7B3517D_1DC1_4B59_A78C_D3E03D29710C */

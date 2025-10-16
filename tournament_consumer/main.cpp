@@ -14,11 +14,13 @@ int main() {
         std::println("after container");
 
         std::thread tournamentCreatedThread([&] {
-            auto listener = container->resolve<QueueMessageConsumer>();
-            listener->Start("tournament.created");
+            auto listener = container->resolve<GroupAddTeamListener>();
+            listener->Start("tournament.team-add");
         });
+        //crear otro thread aqui
 
         tournamentCreatedThread.join();
+        //join de otro thread aqui
         // while (true) {
         //     std::this_thread::sleep_for(std::chrono::seconds(5));
         // }

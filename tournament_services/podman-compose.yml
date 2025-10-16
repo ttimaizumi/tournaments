@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  # Load balancer (HAProxy)
+  loadbalancer:
+    image: haproxy:latest
+    ports:
+      - "8080:8080"
+      - "8404:8404"  # HAProxy stats page
+    volumes:
+      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    depends_on:
+      - app-node-1
+      - app-node-2
+      - app-node-3
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  # Application nodes
+  app-node-1:
+    build:
+      context: .
+      dockerfile: Containerfile
+    environment:
+      - NODE_ID=1
+      - SERVICE_PORT=8080
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pidof", "your-binary-name"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  app-node-2:
+    build:
+      context: .
+      dockerfile: Containerfile
+    environment:
+      - NODE_ID=2
+      - SERVICE_PORT=8080
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pidof", "your-binary-name"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  app-node-3:
+    build:
+      context: .
+      dockerfile: Containerfile
+    environment:
+      - NODE_ID=3
+      - SERVICE_PORT=8080
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pidof", "your-binary-name"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+networks:
+  app-network:
+    driver: bridge
+
+# Optional: Add volumes for persistent data
+# volumes:
+#   app-data:
