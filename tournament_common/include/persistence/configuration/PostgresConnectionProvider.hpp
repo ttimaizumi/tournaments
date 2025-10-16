@@ -39,7 +39,7 @@ public:
             )");
 
             connectionPool.back()->prepare("select_group_by_tournamentid_groupid", "select * from GROUPS where tournament_id = $1 and id = $2");
-            // connectionPool.back()->prepare("update_group", "update GROUPS set name = $2, last_update_date = CURRENT_TIMESTAMP where id = $1  RETURNING id");
+            connectionPool.back()->prepare("update_group", "UPDATE GROUPS SET document = $2, last_update_date = CURRENT_TIMESTAMP WHERE id = $1 RETURNING document");
             connectionPool.back()->prepare("update_group_add_team", R"(
                 update groups
                     set document = jsonb_insert(
@@ -48,6 +48,7 @@ public:
                     last_update_date = CURRENT_TIMESTAMP
                 where id = $1
             )");
+            connectionPool.back()->prepare("delete_group", "DELETE FROM GROUPS WHERE id = $1 RETURNING id");
         }
     }
 

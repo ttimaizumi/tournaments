@@ -5,7 +5,38 @@
 #include "domain/Utilities.hpp"
 #include  "persistence/repository/GroupRepository.hpp"
 
+#include "exception/NotFound.hpp"
+#include "exception/InvalidFormat.hpp"
+#include "exception/Duplicate.hpp"
+
 GroupRepository::GroupRepository(const std::shared_ptr<IDbConnectionProvider>& connectionProvider) : connectionProvider(std::move(connectionProvider)) {}
+
+std::vector<std::shared_ptr<domain::Group>> GroupRepository::FindByTournamentId(const std::string_view& tournamentId) {
+    auto pooled = connectionProvider->Connection();
+    auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
+
+    pqxx::work tx(*(connection->connection));
+    try {
+        pqxx::result result = tx.exec(pqxx::prepped{"select_groups_by_tournament"}, pqxx::params{tournamentId.data()});
+        tx.commit();
+
+    std::vector<std::shared_ptr<domain::Group>> groups;
+    for(auto row : result){
+        nlohmann::json groupDocument = nlohmann::json::parse(row["document"].c_str());
+        auto group = std::make_shared<domain::Group>(groupDocument);
+        group->Id() = row["id"].c_str();
+
+        groups.push_back(group);
+    }
+    return groups;
+    } catch (const pqxx::data_exception& e) {
+        // Handle invalid UUID format
+        if (e.sqlstate() == "22P02") {
+            throw InvalidFormatException("Invalid ID format.");
+        }
+        throw;
+    }
+}
 
 std::shared_ptr<domain::Group> GroupRepository::ReadById(std::string id) {
     return std::make_shared<domain::Group>();
@@ -17,11 +48,19 @@ std::string GroupRepository::Create (const domain::Group & entity) {
     nlohmann::json groupBody = entity;
 
     pqxx::work tx(*(connection->connection));
+    try {
     pqxx::result result = tx.exec(pqxx::prepped{"insert_group"}, pqxx::params{entity.TournamentId(), groupBody.dump()});
-
     tx.commit();
-
+    if (result.empty()) {
+        throw std::runtime_error("Failed to insert group.");
+    }
     return result[0]["id"].c_str();
+    } catch (const pqxx::unique_violation& e) {
+        if (e.sqlstate() == "23505") {
+            throw DuplicateException("A group with the same name already exists in this tournament.");
+        }
+        throw;
+    }
 }
 
 std::string GroupRepository::Update (const domain::Group & entity) {
@@ -30,15 +69,47 @@ std::string GroupRepository::Update (const domain::Group & entity) {
     nlohmann::json groupBody = entity;
 
     pqxx::work tx(*(connection->connection));
-    pqxx::result result = tx.exec(pqxx::prepped{"update_group"}, pqxx::params{entity.Id(), groupBody.dump()});
+    try {
+        pqxx::result result = tx.exec(pqxx::prepped{"update_group"}, pqxx::params{entity.Id(), groupBody.dump()});
+        tx.commit();
 
-    tx.commit();
-
-    return entity.Id();
+        if (result.empty()) {
+            throw NotFoundException("Group not found for update.");
+        }
+        return result[0]["document"].c_str();
+    } catch (const pqxx::data_exception& e) {
+        // Handle invalid UUID format
+        if (e.sqlstate() == "22P02") {
+            throw InvalidFormatException("Invalid group ID format.");
+        }
+        throw;
+    } catch (const pqxx::unique_violation& e) {
+        if (e.sqlstate() == "23505") {
+            throw DuplicateException("A group with the same name already exists in this tournament.");
+        }
+        throw;
+    }
 }
 
 void GroupRepository::Delete(std::string id) {
+    auto pooled = connectionProvider->Connection();
+    auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
 
+    pqxx::work tx(*(connection->connection));
+    try {
+        pqxx::result result = tx.exec(pqxx::prepped{"delete_group"}, pqxx::params{id});
+        tx.commit();
+
+        if (result.empty()) {
+            throw NotFoundException("Group not found for deletion.");
+        }
+    } catch (const pqxx::data_exception& e) {
+        // Handle invalid UUID format
+        if (e.sqlstate() == "22P02") {
+            throw InvalidFormatException("Invalid group ID format.");
+        }
+        throw;
+    }
 }
 
 std::vector<std::shared_ptr<domain::Group>> GroupRepository::ReadAll() {
@@ -58,38 +129,29 @@ std::vector<std::shared_ptr<domain::Group>> GroupRepository::ReadAll() {
     return teams;
 }
 
-std::vector<std::shared_ptr<domain::Group>> GroupRepository::FindByTournamentId(const std::string_view& tournamentId) {
-    auto pooled = connectionProvider->Connection();
-    auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
-
-    pqxx::work tx(*(connection->connection));
-    pqxx::result result = tx.exec(pqxx::prepped{"select_groups_by_tournament"}, pqxx::params{tournamentId.data()});
-    tx.commit();
-
-    std::vector<std::shared_ptr<domain::Group>> groups;
-    for(auto row : result){
-        nlohmann::json groupDocument = nlohmann::json::parse(row["document"].c_str());
-        auto group = std::make_shared<domain::Group>(groupDocument);
-        group->Id() = result[0]["id"].c_str();
-
-        groups.push_back(group);
-    }
-
-    return groups;
-}
-
 std::shared_ptr<domain::Group> GroupRepository::FindByTournamentIdAndGroupId(const std::string_view& tournamentId, const std::string_view& groupId) {
     auto pooled = connectionProvider->Connection();
     auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
 
     pqxx::work tx(*(connection->connection));
-    pqxx::result result = tx.exec(pqxx::prepped{"select_group_by_tournamentid_groupid"}, pqxx::params{tournamentId.data(), groupId.data()});
-    tx.commit();
-    nlohmann::json groupDocument = nlohmann::json::parse(result[0]["document"].c_str());
-    auto group = std::make_shared<domain::Group>(groupDocument);
-    group->Id() = result[0]["id"].c_str();
+    try {
+        const pqxx::result result = tx.exec(pqxx::prepped{"select_group_by_tournamentid_groupid"}, pqxx::params{tournamentId.data(), groupId.data()});
+        tx.commit();
 
-    return group;
+        if (result.empty()) {
+            throw NotFoundException("Group not found in this tournament.");
+        }
+        nlohmann::json groupDocument = nlohmann::json::parse(result[0]["document"].c_str());
+        auto group = std::make_shared<domain::Group>(groupDocument);
+        group->Id() = result[0]["id"].c_str();
+        return group;
+    } catch (const pqxx::data_exception& e) {
+        // Handle invalid UUID format
+        if (e.sqlstate() == "22P02") {
+            throw InvalidFormatException("Invalid group ID format.");
+        }
+        throw;
+    }
 }
 
 std::shared_ptr<domain::Group> GroupRepository::FindByTournamentIdAndTeamId(const std::string_view& tournamentId, const std::string_view& teamId) {

@@ -54,7 +54,7 @@ std::shared_ptr<domain::Team> TeamRepository::ReadById(std::string_view id) {
   } catch (const pqxx::data_exception& e) {
     // Handle invalid UUID format
     if (e.sqlstate() == "22P02") {
-        throw InvalidFormatException("Invalid ID format.");
+        throw InvalidFormatException("Invalid team ID format.");
     }
     throw;
   }
@@ -118,7 +118,7 @@ void TeamRepository::Delete(std::string_view id) {
     }
   } catch (const pqxx::data_exception& e) {
     if (e.sqlstate() == "22P02") {
-      throw InvalidFormatException("Invalid ID format.");
+      throw InvalidFormatException("Invalid team ID format.");
     }
     throw;
   }
