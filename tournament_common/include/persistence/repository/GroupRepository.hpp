@@ -12,6 +12,7 @@
 #include "persistence/configuration/IDbConnectionProvider.hpp"
 #include "persistence/configuration/PostgresConnection.hpp"
 #include "domain/Group.hpp"
+#include "domain/Utilities.hpp"
 
 class GroupRepository : public IGroupRepository {
     std::shared_ptr<IDbConnectionProvider> connectionProvider;
