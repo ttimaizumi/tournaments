@@ -22,50 +22,60 @@ public:
     PostgresConnectionProvider(std::string_view connectionString, size_t poolSize) : connectionString(connectionString), poolSize(poolSize) {
         for (size_t i = 0; i < poolSize; i++) {
             connectionPool.push(std::make_unique<pqxx::connection>(connectionString.data()));
-            // ========== TOURNAMENTS ==========
-            connectionPool.back()->prepare(
-                "insert_tournament",
-                "insert into TOURNAMENTS "
-                "(document) values($1) "
-                "RETURNING id");
-
-            connectionPool.back()->prepare(
-                "select_tournament_by_id",
-                    "select * from TOURNAMENTS "
-                    "where id = $1");
-
-            connectionPool.back()->prepare("update_tournament",
-                R"(UPDATE tournaments
-                            SET document = $1::jsonb, last_update_date = CURRENT_TIMESTAMP
-                            WHERE id = $2 RETURNING id)");
 
             // // ========== TEAMS ==========
+            // CREATE
             connectionPool.back()->prepare(
                 "insert_team",
                 "insert into TEAMS (document) values($1) RETURNING id");
 
+            // READ ID
             connectionPool.back()->prepare(
                 "select_team_by_id",
                 "select * from TEAMS where id = $1");
 
+            // UPDATE
             connectionPool.back()->prepare(
                 "update_team",
                 R"(UPDATE teams
                         SET document = $1::jsonb, last_update_date = CURRENT_TIMESTAMP
                         WHERE id = $2 RETURNING id)");
 
+            // ========== TOURNAMENTS ==========
+            // CREATE
+            connectionPool.back()->prepare(
+                "insert_tournament",
+                "insert into TOURNAMENTS "
+                "(document) values($1) "
+                "RETURNING id");
+
+            // READ ID
+            connectionPool.back()->prepare(
+                "select_tournament_by_id",
+                    "select * from TOURNAMENTS "
+                    "where id = $1");
+
+            // UPDATE
+            connectionPool.back()->prepare("update_tournament",
+                R"(UPDATE tournaments
+                            SET document = $1::jsonb, last_update_date = CURRENT_TIMESTAMP
+                            WHERE id = $2 RETURNING id)");
+
             // ========== GROUPS ==========
+            // CREATE GROUP N  TOURNAMENT ID
             connectionPool.back()->prepare(
                 "insert_group",
                 "insert into GROUPS (tournament_id, document) "
                 "values($1, $2) "
                 "RETURNING id");
 
+            // READ GROUPS BY TOURNAMENT ID
             connectionPool.back()->prepare(
                 "select_groups_by_tournament",
                 "select * from GROUPS "
                 "where tournament_id = $1");
 
+            // READ GROUP IN TOURNAMENT BY TEAM ID
             connectionPool.back()->prepare(
                 "select_group_in_tournament",
                 R"(
@@ -74,18 +84,19 @@ public:
                 and document @> jsonb_build_object('teams', jsonb_build_array(jsonb_build_object('id', $2::text)))
             )");
 
+            // READ GROUP BY TOURNAMENT ID AND GROUP ID
             connectionPool.back()->prepare(
                 "select_group_by_tournamentid_groupid",
                 "select * from GROUPS where tournament_id = $1 and id = $2");
 
+            // UPDATE GROUP ADD TEAM
             // connectionPool.back()->prepare("update_group", "update GROUPS set name = $2, last_update_date = CURRENT_TIMESTAMP where id = $1  RETURNING id");
             connectionPool.back()->prepare(
                 "update_group_add_team",
                 R"(
                 update groups
                     set document = jsonb_insert(
-                            document, '{teams,-1}', $2
-                                   ),
+                            document, '{teams,-1}', $2),
                     last_update_date = CURRENT_TIMESTAMP
                 where id = $1
             )");

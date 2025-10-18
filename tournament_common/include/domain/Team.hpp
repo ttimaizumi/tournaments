@@ -10,10 +10,6 @@ namespace domain {
     struct Team {
         std::string Id;
         std::string Name;
-
-        std::string& getName() { return Name; }
-        const std::string& getName() const { return Name; }
-        void setName(const std::string& name) { Name = name; }
     };
 }
 #endif //RESTAPI_DOMAIN_TEAM_HPP

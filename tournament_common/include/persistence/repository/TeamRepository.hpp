@@ -71,12 +71,9 @@ public:
         nlohmann::json teamBody = entity;
 
         pqxx::work tx(*(connection->connection));
-        pqxx::result result = tx.exec_params(
-            "UPDATE teams SET document = $1::jsonb, last_update_date = CURRENT_TIMESTAMP WHERE id = $2 RETURNING id",
-            teamBody.dump(), entity.Id
-        );
-        // pqxx::result result = tx.exec(pqxx::prepped{"update_team"}, pqxx::params{teamBody.dump(), entity.Id()});
 
+        // pqxx::result result = tx.exec(pqxx::prepped{"update_team"}, pqxx::params{teamBody.dump(), entity.Id()});
+        pqxx::result result = tx.exec(pqxx::prepped{"update_team"}, pqxx::params{teamBody.dump(), entity.Id});
 
         tx.commit();
 
