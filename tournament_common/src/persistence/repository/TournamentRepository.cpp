@@ -54,11 +54,8 @@ std::string TournamentRepository::Update (const domain::Tournament & entity) {
 
     try {
         pqxx::work tx(*(connection->connection));
-        // update document (jsonb) and return id
-        const pqxx::result result = tx.exec_params(
-            "UPDATE tournaments SET document = $1::jsonb, last_update_date = CURRENT_TIMESTAMP WHERE id = $2 RETURNING id",
-            tournamentDoc.dump(), entity.Id()
-        );
+        // update document (jsonb) andz z1 return id
+        const pqxx::result result = tx.exec(pqxx::prepped{"update_tournament"}, pqxx::params{tournamentDoc.dump(), entity.Id()});
 
         tx.commit();
 

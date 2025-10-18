@@ -75,6 +75,9 @@ public:
             "UPDATE teams SET document = $1::jsonb, last_update_date = CURRENT_TIMESTAMP WHERE id = $2 RETURNING id",
             teamBody.dump(), entity.Id
         );
+        // pqxx::result result = tx.exec(pqxx::prepped{"update_team"}, pqxx::params{teamBody.dump(), entity.Id()});
+
+
         tx.commit();
 
         if (result.empty()) return std::string_view{};

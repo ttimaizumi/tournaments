@@ -34,6 +34,11 @@ public:
                     "select * from TOURNAMENTS "
                     "where id = $1");
 
+            connectionPool.back()->prepare("update_tournament",
+                R"(UPDATE tournaments
+                            SET document = $1::jsonb, last_update_date = CURRENT_TIMESTAMP
+                            WHERE id = $2 RETURNING id)");
+
             // // ========== TEAMS ==========
             connectionPool.back()->prepare(
                 "insert_team",
@@ -43,14 +48,23 @@ public:
                 "select_team_by_id",
                 "select * from TEAMS where id = $1");
 
+            connectionPool.back()->prepare(
+                "update_team",
+                R"(UPDATE teams
+                        SET document = $1::jsonb, last_update_date = CURRENT_TIMESTAMP
+                        WHERE id = $2 RETURNING id)");
+
             // ========== GROUPS ==========
             connectionPool.back()->prepare(
                 "insert_group",
-                "insert into GROUPS (tournament_id, document) values($1, $2) RETURNING id");
+                "insert into GROUPS (tournament_id, document) "
+                "values($1, $2) "
+                "RETURNING id");
 
             connectionPool.back()->prepare(
                 "select_groups_by_tournament",
-                "select * from GROUPS where tournament_id = $1");
+                "select * from GROUPS "
+                "where tournament_id = $1");
 
             connectionPool.back()->prepare(
                 "select_group_in_tournament",
