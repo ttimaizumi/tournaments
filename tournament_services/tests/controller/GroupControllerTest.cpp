@@ -65,8 +65,7 @@ TEST_F(GroupControllerFixture, CreateGroup_201_TransfersDomainValues) {
     EXPECT_EQ(captured.Id(),   "g1");
     EXPECT_EQ(captured.Name(), "Group A");
 }
-//fallo y no trono pero WARNIGN ESTE ES EL PELIGROSOOO
-
+// CHECK CHANGE group-conflict to group-already-exists
 /* ============================================================================
  * 2-CREATE 409: transformar JSON -> Group, transferir, conflicto -> 409
  * ==========================================================================*/
@@ -78,7 +77,7 @@ TEST_F(GroupControllerFixture, CreateGroup_409_Conflict) {
     EXPECT_CALL(*delegateMock, CreateGroup(Eq(std::string_view{"t1"}), _))
         .WillOnce(DoAll(
             SaveArg<1>(&captured),
-            Return(std::unexpected(std::string{"group-conflict"}))
+            Return(std::unexpected(std::string{"group-already-exists"}))
         ));
 
     auto res = controller->CreateGroup(req, "t1");
@@ -107,7 +106,7 @@ TEST_F(GroupControllerFixture, ReadById_200_Found) {
 }
 
 
-//trono y no fallo
+// CHECK AND MODIFY CODE FROM GROUP CONTROLLER
 /* ============================================================================
  * 4-READ BY ID 404: ids correctos, nulo -> 404
  * ==========================================================================*/
@@ -177,8 +176,7 @@ TEST_F(GroupControllerFixture, AddTeam_204_NoContent) {
     EXPECT_EQ(res.code, crow::NO_CONTENT);
 }
 
-
-//fallo pero no trono
+// CHECK DELETED ":"
 /* ============================================================================
  * 8- ADD TEAM 422: equipo no existe
  * ==========================================================================*/

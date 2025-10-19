@@ -61,7 +61,7 @@ crow::response GroupController::GetGroups(const std::string& tournamentId) {
 crow::response GroupController::GetGroup(const std::string& tournamentId, const std::string& groupId) {
     try {
         auto r = groupDelegate->GetGroup(tournamentId, groupId);
-        if (!r.has_value()) return crow::response{500, r.error()};
+        if (!r.has_value()) return crow::response{404, r.error()};
         if (!r.value())     return crow::response{crow::NOT_FOUND};
 
         crow::response res{crow::OK, groupToJson(*r.value()).dump()};
@@ -74,7 +74,7 @@ crow::response GroupController::GetGroup(const std::string& tournamentId, const 
 
 crow::response GroupController::CreateGroup(const crow::request& request, const std::string& tournamentId) {
     try {
-        const json j = json::parse(request.body, nullptr, /*allow_exceptions*/ true);
+        const json j = json::parse(request.body, nullptr, true);
         if (!j.contains("id") || !j.contains("name"))
             return crow::response{crow::BAD_REQUEST, "missing id or name"};
 
@@ -139,9 +139,10 @@ crow::response GroupController::UpdateTeams(const crow::request& request,
             const auto& err = r.error();
             if (err == "group-not-found")                 return crow::response{422, "Group does not exist"};
             if (err == "group-full")                      return crow::response{422, "Group at max capacity"};
-            if (err.rfind("team-not-found:", 0) == 0)     return crow::response{422, err};
-            if (err.rfind("team-already-in-group:", 0)==0) return crow::response{422, err};
+            if (err.rfind("team-not-found", 0) == 0)     return crow::response{422, err};
+            if (err.rfind("team-already-in-group", 0)==0) return crow::response{422, err};
             if (err == "misconfigured-dependencies")      return crow::response{500, "GroupDelegate not wired"};
+
             return crow::response{500, err};
         }
         return crow::response{crow::NO_CONTENT};

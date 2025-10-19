@@ -106,7 +106,7 @@ TEST_F(GroupDelegateFixture, CreateGroup_Conflict_ExpectedError) {
     domain::Group g; g.Id() = "dup";
     auto r = delegate->CreateGroup("t1", g);
     ASSERT_FALSE(r.has_value());
-    EXPECT_EQ(r.error(), "group-conflict");
+    EXPECT_EQ(r.error(), "group-already-exists");
 }
 
 TEST_F(GroupDelegateFixture, GetGroup_Found) {
@@ -199,7 +199,7 @@ TEST_F(GroupDelegateFixture, UpdateTeams_AddsAndPublishesPerTeam) {
     auto r = delegate->UpdateTeams("t1", "g1", input);
     EXPECT_TRUE(r.has_value());
 }
-//fallo
+
 TEST_F(GroupDelegateFixture, UpdateTeams_TeamNotFound_ExpectedError) {
     auto g = std::make_shared<domain::Group>(); g->Id() = "g1";
     EXPECT_CALL(*gRepo, FindByTournamentIdAndGroupId(Eq(std::string_view{"t1"}), Eq(std::string_view{"g1"})))

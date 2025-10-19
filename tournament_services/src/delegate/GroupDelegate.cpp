@@ -35,7 +35,7 @@ GroupDelegate::CreateGroup(const std::string_view& tournamentId, const domain::G
     }
 
     auto id = groupRepository->Create(g);
-    if (id.empty()) return std::unexpected(std::string("group-conflict"));
+    if (id.empty()) return std::unexpected(std::string("group-already-exists"));
 
     if (queueProducer) {
         queueProducer->SendMessage(id, "group.created"); // test espera ("g1","group.created")
@@ -100,16 +100,16 @@ GroupDelegate::UpdateTeams(const std::string_view& tournamentId,
     if (group->Teams().size() + teams.size() > kMaxTeamsPerGroup)
         return std::unexpected(std::string("group-full"));
 
-    // 1) pre-validar existencia de cada team (primer ReadById)
-    for (const auto& t : teams) {
-        auto exists = teamRepository->ReadById(std::string{t.Id});
-        if (!exists) return std::unexpected(std::string("team-not-found"));
-    }
-
-    // 2) validar que ninguno ya esté en otro grupo del torneo
+    // 1) validar que ninguno ya esté en otro grupo del torneo
     for (const auto& t : teams) {
         auto located = groupRepository->FindByTournamentIdAndTeamId(tournamentId, t.Id);
         if (located) return std::unexpected(std::string("team-already-in-group"));
+    }
+
+    // 2) pre-validar existencia de cada team (primer ReadById)
+    for (const auto& t : teams) {
+        auto exists = teamRepository->ReadById(std::string{t.Id});
+        if (!exists) return std::unexpected(std::string("team-not-found"));
     }
 
     // 3) añadir y publicar evento (segundo ReadById)
