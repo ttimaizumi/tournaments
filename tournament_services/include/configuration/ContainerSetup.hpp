@@ -1,7 +1,3 @@
-//
-// Created by tomas on 8/22/25.
-//
-
 #ifndef RESTAPI_CONTAINER_SETUP_HPP
 #define RESTAPI_CONTAINER_SETUP_HPP
 
@@ -9,67 +5,85 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <memory>
+#include <string>
+#include <string_view>
 
 #include "persistence/repository/IRepository.hpp"
 #include "persistence/repository/TeamRepository.hpp"
-#include "RunConfiguration.hpp"
-#include "cms/ConnectionManager.hpp"
-#include "delegate/TeamDelegate.hpp"
-#include "controller/TeamController.hpp"
-#include "controller/TournamentController.hpp"
-#include "delegate/TournamentDelegate.hpp"
-#include "persistence/configuration/PostgresConnectionProvider.hpp"
 #include "persistence/repository/TournamentRepository.hpp"
 #include "persistence/repository/GroupRepository.hpp"
+
+#include "persistence/configuration/PostgresConnectionProvider.hpp"
+
+#include "cms/IQueueMessageProducer.hpp"
 #include "cms/QueueMessageProducer.hpp"
-#include "cms/QueueResolver.hpp"
-#include "delegate/IGroupDelegate.hpp"
+
+#include "delegate/TeamDelegate.hpp"
+#include "delegate/TournamentDelegate.hpp"
 #include "delegate/GroupDelegate.hpp"
+
+#include "controller/TeamController.hpp"
+#include "controller/TournamentController.hpp"
 #include "controller/GroupController.hpp"
 
+#include "RunConfiguration.hpp"
+
 namespace config {
-    inline std::shared_ptr<Hypodermic::Container> containerSetup() {
-        Hypodermic::ContainerBuilder builder;
 
-        std::ifstream file("configuration.json");
-        nlohmann::json configuration;
-        file >> configuration;
-        std::shared_ptr<RunConfiguration> appConfig = std::make_shared<RunConfiguration>(configuration["runConfig"]);
-        builder.registerInstance(appConfig);
+inline std::shared_ptr<Hypodermic::Container> containerSetup() {
+    Hypodermic::ContainerBuilder builder;
 
-        std::shared_ptr<PostgresConnectionProvider> postgressConnection = std::make_shared<PostgresConnectionProvider>(
-            configuration["databaseConfig"]["connectionString"].get<std::string>(),
-            configuration["databaseConfig"]["poolSize"].get<size_t>());
-        builder.registerInstance(postgressConnection).as<IDbConnectionProvider>();
+    // config
+    std::ifstream file("configuration.json");
+    nlohmann::json configuration;
+    file >> configuration;
 
-        builder.registerType<ConnectionManager>()
-            .onActivated([configuration](Hypodermic::ComponentContext&, const std::shared_ptr<ConnectionManager>& instance) {
-                instance->initialize(configuration["activemq"]["broker-url"].get<std::string>());
-            })
-            .singleInstance();
+    auto appConfig = std::make_shared<RunConfiguration>(configuration["runConfig"]);
+    builder.registerInstance(appConfig);
 
-        builder.registerType<QueueMessageProducer>().named("tournamentAddTeamQueue");
-        builder.registerType<QueueResolver>().as<IResolver<IQueueMessageProducer> >().named("queueResolver").
-                singleInstance();
+    auto pg = std::make_shared<PostgresConnectionProvider>(
+        configuration["databaseConfig"]["connectionString"].get<std::string>(),
+        configuration["databaseConfig"]["poolSize"].get<size_t>());
+    builder.registerInstance(pg).as<IDbConnectionProvider>();
 
-        builder.registerType<TeamRepository>().as<IRepository<domain::Team, std::string_view> >().singleInstance();
-        builder.registerType<GroupRepository>().as<IGroupRepository>().singleInstance();
+    // Producer de colas (inyectar como interfaz)
+    builder.registerType<QueueMessageProducer>()
+           .as<IQueueMessageProducer>()
+           .singleInstance();
 
-        builder.registerType<TeamDelegate>().as<ITeamDelegate>().singleInstance();
-        builder.registerType<TeamController>().singleInstance();
+    // Repos
+    builder.registerType<TournamentRepository>()
+           .as<IRepository<domain::Tournament, std::string>>()  // Tournament usa std::string
+           .singleInstance();
 
-        builder.registerType<TournamentRepository>().as<IRepository<domain::Tournament, std::string> >().
-                singleInstance();
+    builder.registerType<TeamRepository>()
+           .as<IRepository<domain::Team, std::string_view>>()   // Team usa std::string_view
+           .singleInstance();
 
-        builder.registerType<TournamentDelegate>()
-                .as<ITournamentDelegate>()
-                .singleInstance();
-        builder.registerType<TournamentController>().singleInstance();
+    builder.registerType<GroupRepository>()
+           .as<IGroupRepository>()
+           .singleInstance();
 
-        builder.registerType<GroupDelegate>().as<IGroupDelegate>().singleInstance();
-        builder.registerType<GroupController>().singleInstance();
+    // Delegates
+    builder.registerType<TeamDelegate>()
+           .as<ITeamDelegate>()
+           .singleInstance();
 
-        return builder.build();
-    }
+    builder.registerType<TournamentDelegate>()
+           .as<ITournamentDelegate>()
+           .singleInstance();
+
+    builder.registerType<GroupDelegate>()
+           .as<IGroupDelegate>()
+           .singleInstance();
+
+    // Controllers
+    builder.registerType<TeamController>().singleInstance();
+    builder.registerType<TournamentController>().singleInstance();
+    builder.registerType<GroupController>().singleInstance();
+
+    return builder.build();
 }
-#endif //RESTAPI_CONTAINER_SETUP_HPP
+
+} // namespace config
+#endif // RESTAPI_CONTAINER_SETUP_HPP

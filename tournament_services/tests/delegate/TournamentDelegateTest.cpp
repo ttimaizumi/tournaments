@@ -1,4 +1,5 @@
-// TournamentDelegateTest.cpp
+// TournamentDelegateTest.cpp - requerimientos minimos
+
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 #include <memory>
@@ -44,9 +45,16 @@ protected:
     }
 };
 
-// REQ: crear torneo -> validar objeto enviado a Repository y que regresa el id generado.
-// Ademas debe enviar mensaje a la cola cuando hay id.
-TEST_F(TournamentDelegateFixture, CreateTournament_Success_ReturnsId_And_SendsMessage) {
+/* =====================================================================================
+ * REQUERIMIENTO: Creacion valida
+ * "validar que el valor que se le transfiera a TournamentRepository es el esperado.
+ *  Simular una insercion valida y que la respuesta sea el ID generado"
+ * - Se valida objeto enviado a repo->Create(...)
+ * - Repo devuelve "gen-1"
+ * - Delegate devuelve "gen-1"
+ * - Adicional (no requerido, pero realista): si hay id, se envia mensaje
+ * ===================================================================================== */
+TEST_F(TournamentDelegateFixture, CreateTournament_Success_TransfersToRepository_ReturnsId_And_SendsMessage) {
     auto in = std::make_shared<domain::Tournament>();
     in->Id() = "t1";
     in->Name() = "Alpha";
@@ -65,23 +73,46 @@ TEST_F(TournamentDelegateFixture, CreateTournament_Success_ReturnsId_And_SendsMe
     EXPECT_EQ(id, "gen-1");
 }
 
-// REQ: crear torneo -> insercion fallida usando senalizacion (aqui id vacio) y NO enviar mensaje.
-TEST_F(TournamentDelegateFixture, CreateTournament_Failure_ReturnsEmpty_NoMessage) {
+/* =====================================================================================
+ * REQUERIMIENTO: Creacion fallida usando std::expected
+ * "validar que el valor que se le transfiera a TournamentRepository es el esperado.
+ *  Simular una insercion fallida y que la respuesta sea un error o mensaje usando std::expected"
+ * - Se valida objeto enviado a repo->Create(...)
+ * - Repo devuelve string vacio -> conflicto
+ * - Delegate::CreateTournamentEx(...) devuelve expected en error "conflict"
+ * ===================================================================================== */
+TEST_F(TournamentDelegateFixture, CreateTournament_Failure_TransfersToRepository_ReturnsExpectedError) {
     auto in = std::make_shared<domain::Tournament>();
     in->Id() = "dup";
     in->Name() = "X";
 
+    domain::Tournament captured{};
     EXPECT_CALL(*repo, Create(_))
-        .WillOnce(Return(std::string{}));
+        .WillOnce(DoAll(
+            ::testing::SaveArg<0>(&captured),
+            Return(std::string{}) // simula conflicto
+        ));
 
+    auto r = delegate->CreateTournamentEx(in);
+
+    // expected en error
+    EXPECT_FALSE(r.has_value());
+    EXPECT_EQ(r.error(), "conflict");
+
+    // validar objeto transferido
+    EXPECT_EQ(captured.Id(), "dup");
+    EXPECT_EQ(captured.Name(), "X");
+
+    // al fallar no se envia mensaje
     EXPECT_CALL(*producer, SendMessage(_, _)).Times(0);
-
-    auto id = delegate->CreateTournament(in);
-    EXPECT_TRUE(id.empty());
 }
 
-// REQ: read-by-id -> validar id enviado a Repository, simular resultado objeto y validar contenido.
-TEST_F(TournamentDelegateFixture, ReadById_Found_ReturnsObject) {
+/* =====================================================================================
+ * REQUERIMIENTO: ReadById encontrado
+ * "validar que el valor que se le transfiera a TournamentRepository es el esperado.
+ *  Simular el resultado con un objeto y validar valores del objeto"
+ * ===================================================================================== */
+TEST_F(TournamentDelegateFixture, ReadById_Found_TransfersIdToRepository_ReturnsObject) {
     auto stored = std::make_shared<domain::Tournament>();
     stored->Id() = "t9";
     stored->Name() = "Gamma";
@@ -95,8 +126,12 @@ TEST_F(TournamentDelegateFixture, ReadById_Found_ReturnsObject) {
     EXPECT_EQ(got->Name(), "Gamma");
 }
 
-// REQ: read-by-id -> validar id enviado a Repository, simular resultado nulo y validar nullptr.
-TEST_F(TournamentDelegateFixture, ReadById_NotFound_ReturnsNull) {
+/* =====================================================================================
+ * REQUERIMIENTO: ReadById no encontrado
+ * "validar que el valor que se le transfiera a TournamentRepository es el esperado.
+ *  Simular el resultado nulo y validar nullptr"
+ * ===================================================================================== */
+TEST_F(TournamentDelegateFixture, ReadById_NotFound_TransfersIdToRepository_ReturnsNull) {
     EXPECT_CALL(*repo, ReadById(Eq(std::string{"zzz"})))
         .WillOnce(Return(nullptr));
 
@@ -104,7 +139,10 @@ TEST_F(TournamentDelegateFixture, ReadById_NotFound_ReturnsNull) {
     EXPECT_EQ(got, nullptr);
 }
 
-// REQ: read-all -> simular lista con objetos y validar que se regresa igual.
+/* =====================================================================================
+ * REQUERIMIENTO: ReadAll con items
+ * "Simular el resultado con una lista de objetos de TournamentRepository"
+ * ===================================================================================== */
 TEST_F(TournamentDelegateFixture, ReadAll_WithItems) {
     auto t1 = std::make_shared<domain::Tournament>();
     t1->Id() = "a"; t1->Name() = "A";
@@ -123,7 +161,10 @@ TEST_F(TournamentDelegateFixture, ReadAll_WithItems) {
     EXPECT_EQ(result[1]->Name(), "B");
 }
 
-// REQ: read-all -> simular lista vacia.
+/* =====================================================================================
+ * REQUERIMIENTO: ReadAll vacio
+ * "Simular el resultado con una lista vacia de TournamentRepository"
+ * ===================================================================================== */
 TEST_F(TournamentDelegateFixture, ReadAll_Empty) {
     EXPECT_CALL(*repo, ReadAll())
         .WillOnce(Return(std::vector<std::shared_ptr<domain::Tournament>>{}));
@@ -132,17 +173,22 @@ TEST_F(TournamentDelegateFixture, ReadAll_Empty) {
     EXPECT_TRUE(result.empty());
 }
 
-// REQ: update -> buscar por id, validar objeto enviado a Update y simular exito.
-TEST_F(TournamentDelegateFixture, UpdateTournament_Success) {
+/* =====================================================================================
+ * REQUERIMIENTO: Update exitoso
+ * "validar la busqueda de TournamentRepository por ID, validar el valor transferido a Update.
+ *  Simular resultado exitoso"
+ * - Primero ReadById("t1") devuelve existente
+ * - Se valida objeto pasado a Update(Id y Name)
+ * - Repo::Update devuelve "t1" (exito) -> delegate::UpdateTournament(...) true
+ * ===================================================================================== */
+TEST_F(TournamentDelegateFixture, UpdateTournament_Success_ReadsById_TransfersToUpdate) {
     domain::Tournament in;
     in.Id() = "t1";
     in.Name() = "New Name";
 
-    // primero debe existir
     EXPECT_CALL(*repo, ReadById(Eq(std::string{"t1"})))
         .WillOnce(Return(std::make_shared<domain::Tournament>()));
 
-    // luego debe llamar Update con los valores esperados y devolver id no vacio
     EXPECT_CALL(*repo,
         Update(Truly([](const domain::Tournament& t){
             return t.Id() == "t1" && t.Name() == "New Name";
@@ -153,17 +199,18 @@ TEST_F(TournamentDelegateFixture, UpdateTournament_Success) {
     EXPECT_TRUE(ok);
 }
 
-// REQ: update -> si no existe (busqueda no exitosa) debe regresar error (aqui false) y NO llamar Update.
-TEST_F(TournamentDelegateFixture, UpdateTournament_NotFound) {
-    domain::Tournament in;
-    in.Id() = "missing";
-    in.Name() = "X";
-
+/* =====================================================================================
+ * REQUERIMIENTO: Update no encontrado usando std::expected
+ * "validar la busqueda de TournamentRepository por ID. Simular resultado de busqueda no
+ *  exitoso y regresar error o mensaje usando std::expected"
+ * - ReadById("missing") -> nullptr
+ * - UpdateTournamentEx(...) devuelve expected en error "not found"
+ * ===================================================================================== */
+TEST_F(TournamentDelegateFixture, UpdateTournament_NotFound_ReadsById_ReturnsExpectedError) {
     EXPECT_CALL(*repo, ReadById(Eq(std::string{"missing"})))
         .WillOnce(Return(nullptr));
 
-    EXPECT_CALL(*repo, Update(_)).Times(0);
-
-    bool ok = delegate->UpdateTournament(in);
-    EXPECT_FALSE(ok);
+    auto r = delegate->UpdateTournamentEx(domain::Tournament{}, std::string{"missing"}, std::string{"X"});
+    EXPECT_FALSE(r.has_value());
+    EXPECT_EQ(r.error(), "not found");
 }
