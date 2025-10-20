@@ -40,21 +40,33 @@ public:
     MOCK_METHOD((std::vector<std::shared_ptr<domain::Team>>), ReadAll, (), (override));
 };
 
+class QueueMessageProducerMock : public QueueMessageProducer {
+public:
+    QueueMessageProducerMock() : QueueMessageProducer(nullptr) {}
+
+    MOCK_METHOD(void, SendMessage, (const std::string_view&, const std::string_view&), (override));
+};
+
 class GroupDelegateTest : public ::testing::Test {
 protected:
     std::shared_ptr<TournamentRepositoryMock> tournamentRepositoryMock;
+    std::shared_ptr<QueueMessageProducerMock> producerMockPtr;
+    QueueMessageProducerMock* producerMock;
     std::shared_ptr<GroupRepositoryMock> groupRepositoryMock;
     std::shared_ptr<TeamRepositoryMock> teamRepositoryMock;
     std::shared_ptr<GroupDelegate> groupDelegate;
 
     void SetUp() override {
+        producerMockPtr = std::make_shared<QueueMessageProducerMock>();
+        producerMock = producerMockPtr.get();
         tournamentRepositoryMock = std::make_shared<TournamentRepositoryMock>();
         groupRepositoryMock = std::make_shared<GroupRepositoryMock>();
         teamRepositoryMock = std::make_shared<TeamRepositoryMock>();
         groupDelegate = std::make_shared<GroupDelegate>(
             tournamentRepositoryMock,
             groupRepositoryMock,
-            teamRepositoryMock
+            teamRepositoryMock,
+            producerMockPtr
         );
     }
 

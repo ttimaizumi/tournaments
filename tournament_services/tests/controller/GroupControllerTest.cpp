@@ -31,7 +31,6 @@ protected:
     }
 };
 
-// Test CreateGroup - success (HTTP 201)
 TEST_F(GroupControllerTest, CreateGroup_Success) {
     domain::Group capturedGroup;
 
@@ -57,7 +56,6 @@ TEST_F(GroupControllerTest, CreateGroup_Success) {
     EXPECT_EQ("group-id-123", response.get_header_value("location"));
 }
 
-// Test CreateGroup - error duplicate (HTTP 422)
 TEST_F(GroupControllerTest, CreateGroup_Error) {
     EXPECT_CALL(*groupDelegateMock, CreateGroup(testing::Eq("tournament-1"), testing::_))
         .WillOnce(testing::Return(std::unexpected<std::string>("Group already exists")));
@@ -74,7 +72,6 @@ TEST_F(GroupControllerTest, CreateGroup_Error) {
     EXPECT_EQ(422, response.code);
 }
 
-// Test GetGroup - success (HTTP 200)
 TEST_F(GroupControllerTest, GetGroup_Success) {
     auto expectedGroup = std::make_shared<domain::Group>("Group A", "group-1");
     expectedGroup->TournamentId() = "tournament-1";
@@ -85,12 +82,15 @@ TEST_F(GroupControllerTest, GetGroup_Success) {
     crow::response response = groupController->GetGroup("tournament-1", "group-1");
     auto jsonResponse = crow::json::load(response.body);
 
+    ASSERT_TRUE(jsonResponse);
+    ASSERT_TRUE(jsonResponse.has("name"));
+    ASSERT_TRUE(jsonResponse.has("id"));
+
     EXPECT_EQ(crow::OK, response.code);
     EXPECT_EQ("Group A", jsonResponse["name"].s());
     EXPECT_EQ("group-1", jsonResponse["id"].s());
 }
 
-// Test GetGroup - not found (HTTP 404)
 TEST_F(GroupControllerTest, GetGroup_NotFound) {
     EXPECT_CALL(*groupDelegateMock, GetGroup(testing::Eq("tournament-1"), testing::Eq("group-1")))
         .WillOnce(testing::Return(std::unexpected<std::string>("Group not found")));
@@ -100,7 +100,6 @@ TEST_F(GroupControllerTest, GetGroup_NotFound) {
     EXPECT_EQ(crow::INTERNAL_SERVER_ERROR, response.code);
 }
 
-// Test GetGroups - success with list (HTTP 200)
 TEST_F(GroupControllerTest, GetGroups_Success) {
     std::vector<std::shared_ptr<domain::Group>> groups;
     auto group1 = std::make_shared<domain::Group>("Group A", "group-1");
@@ -116,11 +115,11 @@ TEST_F(GroupControllerTest, GetGroups_Success) {
     crow::response response = groupController->GetGroups("tournament-1");
     auto jsonResponse = crow::json::load(response.body);
 
+    ASSERT_TRUE(jsonResponse);
     EXPECT_EQ(crow::OK, response.code);
     EXPECT_EQ(2, jsonResponse.size());
 }
 
-// Test GetGroups - empty list (HTTP 200)
 TEST_F(GroupControllerTest, GetGroups_EmptyList) {
     std::vector<std::shared_ptr<domain::Group>> emptyGroups;
 
@@ -130,11 +129,11 @@ TEST_F(GroupControllerTest, GetGroups_EmptyList) {
     crow::response response = groupController->GetGroups("tournament-1");
     auto jsonResponse = crow::json::load(response.body);
 
+    ASSERT_TRUE(jsonResponse);
     EXPECT_EQ(crow::OK, response.code);
     EXPECT_EQ(0, jsonResponse.size());
 }
 
-// Test UpdateGroup - success (HTTP 204)
 TEST_F(GroupControllerTest, UpdateGroup_Success) {
     domain::Group capturedGroup;
 
@@ -157,7 +156,6 @@ TEST_F(GroupControllerTest, UpdateGroup_Success) {
     EXPECT_EQ("group-1", capturedGroup.Id());
 }
 
-// Test UpdateGroup - not found (HTTP 404)
 TEST_F(GroupControllerTest, UpdateGroup_NotFound) {
     EXPECT_CALL(*groupDelegateMock, UpdateGroup(testing::Eq("tournament-1"), testing::_))
         .WillOnce(testing::Return(std::unexpected<std::string>("Group doesn't exist")));
@@ -171,7 +169,6 @@ TEST_F(GroupControllerTest, UpdateGroup_NotFound) {
     EXPECT_EQ(crow::NOT_FOUND, response.code);
 }
 
-// Test UpdateTeams - success (HTTP 204)
 TEST_F(GroupControllerTest, UpdateTeams_Success) {
     std::vector<domain::Team> capturedTeams;
 
@@ -198,7 +195,6 @@ TEST_F(GroupControllerTest, UpdateTeams_Success) {
     EXPECT_EQ("Team A", capturedTeams[0].Name);
 }
 
-// Test UpdateTeams - team doesn't exist (HTTP 422)
 TEST_F(GroupControllerTest, UpdateTeams_TeamDoesNotExist) {
     EXPECT_CALL(*groupDelegateMock, UpdateTeams(testing::Eq("tournament-1"), testing::Eq("group-1"), testing::_))
         .WillOnce(testing::Return(std::unexpected<std::string>("Team team-1 doesn't exist")));
@@ -214,7 +210,6 @@ TEST_F(GroupControllerTest, UpdateTeams_TeamDoesNotExist) {
     EXPECT_EQ(422, response.code);
 }
 
-// Test UpdateTeams - group is full (HTTP 422)
 TEST_F(GroupControllerTest, UpdateTeams_GroupFull) {
     EXPECT_CALL(*groupDelegateMock, UpdateTeams(testing::Eq("tournament-1"), testing::Eq("group-1"), testing::_))
         .WillOnce(testing::Return(std::unexpected<std::string>("Group at max capacity")));
@@ -230,7 +225,6 @@ TEST_F(GroupControllerTest, UpdateTeams_GroupFull) {
     EXPECT_EQ(422, response.code);
 }
 
-// Test RemoveGroup - success (HTTP 204)
 TEST_F(GroupControllerTest, RemoveGroup_Success) {
     EXPECT_CALL(*groupDelegateMock, RemoveGroup(testing::Eq("tournament-1"), testing::Eq("group-1")))
         .WillOnce(testing::Return(std::expected<void, std::string>()));
@@ -242,7 +236,6 @@ TEST_F(GroupControllerTest, RemoveGroup_Success) {
     EXPECT_EQ(crow::NO_CONTENT, response.code);
 }
 
-// Test RemoveGroup - group not found (HTTP 404)
 TEST_F(GroupControllerTest, RemoveGroup_GroupNotFound) {
     EXPECT_CALL(*groupDelegateMock, RemoveGroup(testing::Eq("tournament-1"), testing::Eq("group-1")))
         .WillOnce(testing::Return(std::unexpected<std::string>("Group doesn't exist")));
@@ -252,7 +245,6 @@ TEST_F(GroupControllerTest, RemoveGroup_GroupNotFound) {
     EXPECT_EQ(crow::NOT_FOUND, response.code);
 }
 
-// Test RemoveGroup - tournament not found (HTTP 404)
 TEST_F(GroupControllerTest, RemoveGroup_TournamentNotFound) {
     EXPECT_CALL(*groupDelegateMock, RemoveGroup(testing::Eq("tournament-1"), testing::Eq("group-1")))
         .WillOnce(testing::Return(std::unexpected<std::string>("Tournament doesn't exist")));
