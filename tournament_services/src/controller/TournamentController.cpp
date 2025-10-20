@@ -78,10 +78,11 @@ crow::response TournamentController::UpdateTournament(const crow::request& reque
 
     std::string updatedId(tournamentDelegate->UpdateTournament(tournament));
 
-    crow::response response;
-    response.code = crow::OK;
-    response.add_header("location", updatedId);
-    return response;
+    if(updatedId.empty()) {
+        return crow::response{crow::NOT_FOUND};
+    }
+
+    return crow::response{crow::NO_CONTENT};
 }
 
 REGISTER_ROUTE(TournamentController, CreateTournament, "/tournaments", "POST"_method)

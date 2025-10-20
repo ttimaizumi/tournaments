@@ -22,6 +22,7 @@ public:
     std::vector<std::shared_ptr<domain::Tournament>> ReadAll() override;
 
     bool ExistsByName(const std::string& name);
+    bool ExistsById(const std::string& id);
 };
 
 #endif //TOURNAMENTS_TOURNAMENTREPOSITORY_HPP

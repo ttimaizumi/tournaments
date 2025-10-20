@@ -40,5 +40,10 @@ std::shared_ptr<domain::Tournament> TournamentDelegate::ReadById(const std::stri
 }
 
 std::string_view TournamentDelegate::UpdateTournament(const domain::Tournament& tournament){
+    auto tournamentRepo = dynamic_cast<TournamentRepository*>(tournamentRepository.get());
+    if(tournamentRepo && !tournamentRepo->ExistsById(tournament.Id())) {
+        return "";
+    }
+
     return tournamentRepository->Update(tournament);
 }

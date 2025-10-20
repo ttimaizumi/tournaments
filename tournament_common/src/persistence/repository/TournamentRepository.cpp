@@ -96,3 +96,14 @@ bool TournamentRepository::ExistsByName(const std::string& name) {
 
     return result[0]["count"].as<int>() > 0;
 }
+
+bool TournamentRepository::ExistsById(const std::string& id) {
+    auto pooled = connectionProvider->Connection();
+    auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
+
+    pqxx::work tx(*(connection->connection));
+    pqxx::result result = tx.exec(pqxx::prepped{"check_tournament_exists_by_id"}, id);
+    tx.commit();
+
+    return result[0]["count"].as<int>() > 0;
+}
