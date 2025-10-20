@@ -71,10 +71,11 @@ crow::response TeamController::UpdateTeam(const crow::request& request, const st
 
     std::string updatedId(teamDelegate->UpdateTeam(team));
 
-    crow::response response;
-    response.code = crow::OK;
-    response.add_header("location", updatedId);
-    return response;
+    if(updatedId.empty()) {
+        return crow::response{crow::NOT_FOUND}; 
+    }
+
+    return crow::response{crow::NO_CONTENT};
 }
 
 REGISTER_ROUTE(TeamController, getTeam, "/teams/<string>", "GET"_method)

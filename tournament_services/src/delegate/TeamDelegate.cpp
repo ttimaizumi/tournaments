@@ -28,8 +28,12 @@ std::string_view TeamDelegate::SaveTeam(const domain::Team& team){
     return teamRepository->Create(team);
 }
 
-
 std::string_view TeamDelegate::UpdateTeam(const domain::Team& team){
+    auto teamRepo = dynamic_cast<TeamRepository*>(teamRepository.get());
+    if(teamRepo && !teamRepo->ExistsById(team.Id)) {
+        return "";
+    }
+
     return teamRepository->Update(team);
 }
 

@@ -93,6 +93,17 @@ public:
 
         return result[0]["count"].as<int>() > 0;
     }
+
+    bool ExistsById(const std::string& id) {
+        auto pooled = connectionProvider->Connection();
+        auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
+
+        pqxx::work tx(*(connection->connection));
+        pqxx::result result = tx.exec(pqxx::prepped{"check_team_exists_by_id"}, id);
+        tx.commit();
+
+        return result[0]["count"].as<int>() > 0;
+    }
 };
 
 #endif //RESTAPI_TEAMREPOSITORY_HPP
