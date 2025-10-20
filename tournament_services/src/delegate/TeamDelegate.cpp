@@ -1,7 +1,3 @@
-//
-// Created by tomas on 8/22/25.
-//
-
 #include "delegate/TeamDelegate.hpp"
 
 #include <expected>

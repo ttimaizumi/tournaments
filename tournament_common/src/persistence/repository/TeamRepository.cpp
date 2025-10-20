@@ -1,11 +1,10 @@
-#include "persistence/repository/TeamRepository.hpp"
-
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <string>
 #include <iostream>
 
 #include "domain/Utilities.hpp"
+#include "persistence/repository/TeamRepository.hpp"
 #include "persistence/configuration/PostgresConnection.hpp"
 
 TeamRepository::TeamRepository(
