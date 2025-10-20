@@ -13,8 +13,10 @@ set(TEST_COMMON_LIBS
 include_directories(../include)
 
 add_executable(test_runner
+        controller/GroupControllerTest.cpp
         controller/TeamControllerTest.cpp
         controller/TournamentControllerTest.cpp
+        delegate/GroupDelegateTest.cpp
         delegate/TeamDelegateTest.cpp
         delegate/TournamentDelegateTest.cpp
         ../src/controller/GroupController.cpp
