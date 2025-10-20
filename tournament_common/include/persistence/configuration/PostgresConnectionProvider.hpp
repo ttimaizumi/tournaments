@@ -29,6 +29,7 @@ public:
             connectionPool.back()->prepare("insert_team", "insert into TEAMS (document) values($1) RETURNING id");
             connectionPool.back()->prepare("select_team_by_id", "select * from TEAMS where id = $1");
             connectionPool.back()->prepare("update_team", "update TEAMS set document = $2 where id = $1 RETURNING id");
+            connectionPool.back()->prepare("check_team_exists","SELECT COUNT(*) as count FROM teams WHERE document->>'name' = $1");
 
             connectionPool.back()->prepare("insert_group", "insert into GROUPS (tournament_id, document) values($1, $2) RETURNING id");
             connectionPool.back()->prepare("select_groups_by_tournament", "select * from GROUPS where tournament_id = $1");

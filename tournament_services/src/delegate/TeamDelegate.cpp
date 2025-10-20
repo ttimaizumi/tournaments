@@ -3,6 +3,7 @@
 //
 
 #include "delegate/TeamDelegate.hpp"
+#include "persistence/repository/TeamRepository.hpp"
 
 #include <utility>
 
@@ -18,9 +19,15 @@ std::shared_ptr<domain::Team> TeamDelegate::GetTeam(std::string_view id) {
 }
 
 std::string_view TeamDelegate::SaveTeam(const domain::Team& team){
+    auto teamRepo = dynamic_cast<TeamRepository*>(teamRepository.get());
+
+    if(teamRepo && teamRepo->ExistsByName(team.Name)) {
+        return "";
+    }
 
     return teamRepository->Create(team);
 }
+
 
 std::string_view TeamDelegate::UpdateTeam(const domain::Team& team){
     return teamRepository->Update(team);

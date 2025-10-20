@@ -15,7 +15,6 @@
 #include "domain/Team.hpp"
 #include "domain/Utilities.hpp"
 
-
 class TeamRepository : public IRepository<domain::Team, std::string_view> {
     std::shared_ptr<IDbConnectionProvider> connectionProvider;
 public:
@@ -80,11 +79,20 @@ public:
         return result[0]["id"].c_str();
     }
 
-
     void Delete(std::string_view id) override{
         
     }
-};
 
+    bool ExistsByName(const std::string& name) {
+        auto pooled = connectionProvider->Connection();
+        auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
+
+        pqxx::work tx(*(connection->connection));
+        pqxx::result result = tx.exec(pqxx::prepped{"check_team_exists"}, name);
+        tx.commit();
+
+        return result[0]["count"].as<int>() > 0;
+    }
+};
 
 #endif //RESTAPI_TEAMREPOSITORY_HPP

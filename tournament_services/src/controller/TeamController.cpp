@@ -9,7 +9,6 @@
 #include "controller/TeamController.hpp"
 #include "domain/Utilities.hpp"
 
-
 TeamController::TeamController(const std::shared_ptr<ITeamDelegate>& teamDelegate) : teamDelegate(teamDelegate) {}
 
 crow::response TeamController::getTeam(const std::string& teamId) const {
@@ -45,6 +44,12 @@ crow::response TeamController::SaveTeam(const crow::request& request) const {
     domain::Team team = requestBody;
 
     auto createdId = teamDelegate->SaveTeam(team);
+
+    if(createdId.empty()) {
+        response.code = crow::CONFLICT;
+        return response;
+    }
+
     response.code = crow::CREATED;
     response.add_header("location", createdId.data());
 
