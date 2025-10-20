@@ -75,4 +75,4 @@ crow::response TeamController::UpdateTeam(const crow::request& request, const st
 REGISTER_ROUTE(TeamController, getTeam, "/teams/<string>", "GET"_method)
 REGISTER_ROUTE(TeamController, getAllTeams, "/teams", "GET"_method)
 REGISTER_ROUTE(TeamController, SaveTeam, "/teams", "POST"_method)
-REGISTER_ROUTE(TeamController, UpdateTeam, "/teams/<string>", "PUT"_method)
+REGISTER_ROUTE(TeamController, UpdateTeam, "/teams/<string>", "PATCH"_method)

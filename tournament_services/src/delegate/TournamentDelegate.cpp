@@ -34,6 +34,6 @@ std::shared_ptr<domain::Tournament> TournamentDelegate::ReadById(const std::stri
     return tournamentRepository->ReadById(id);
 }
 
-void TournamentDelegate::Delete(const std::string& id) {
-    tournamentRepository->Delete(id);
+std::string_view TournamentDelegate::UpdateTournament(const domain::Tournament& tournament){
+    return tournamentRepository->Update(tournament);
 }

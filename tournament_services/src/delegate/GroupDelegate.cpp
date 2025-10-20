@@ -36,59 +36,15 @@ std::expected<std::vector<std::shared_ptr<domain::Group>>, std::string> GroupDel
         return std::unexpected("Error when reading to DB");
     }
 }
-std::expected<std::shared_ptr<domain::Group>, std::string> GroupDelegate::GetGroup(const std::string_view& tournamentId, const std::string_view& groupId) {
-    try {
-        return groupRepository->FindByTournamentIdAndGroupId(tournamentId, groupId);
-    } catch (const std::exception& e) {
-        return std::unexpected("Error when reading to DB");
-    }
-}
-std::expected<void, std::string> GroupDelegate::UpdateGroup(const std::string_view& tournamentId, const domain::Group& group) {
-    auto tournament = tournamentRepository->ReadById(tournamentId.data());
-    if (tournament == nullptr) {
-        return std::unexpected("Tournament doesn't exist");
-    }
-
-    auto existingGroup = groupRepository->FindByTournamentIdAndGroupId(tournamentId, group.Id());
-    if (existingGroup == nullptr) {
-        return std::unexpected("Group doesn't exist");
-    }
-
-    domain::Group updatedGroup = group;
-    updatedGroup.TournamentId() = tournament->Id();
-
-    try {
-        groupRepository->Update(updatedGroup);
-        return {};
-    } catch (const std::exception& e) {
-        return std::unexpected("Error updating group");
-    }
-}
-std::expected<void, std::string> GroupDelegate::RemoveGroup(const std::string_view& tournamentId, const std::string_view& groupId) {
-    auto tournament = tournamentRepository->ReadById(tournamentId.data());
-    if (tournament == nullptr) {
-        return std::unexpected("Tournament doesn't exist");
-    }
-
-    auto existingGroup = groupRepository->FindByTournamentIdAndGroupId(tournamentId, groupId);
-    if (existingGroup == nullptr) {
-        return std::unexpected("Group doesn't exist");
-    }
-
-    try {
-        groupRepository->Delete(groupId.data());
-        return {};
-    } catch (const std::exception& e) {
-        return std::unexpected("Error deleting group");
-    }
-}
 
 std::expected<void, std::string> GroupDelegate::UpdateTeams(const std::string_view& tournamentId, const std::string_view& groupId, const std::vector<domain::Team>& teams) {
     const auto group = groupRepository->FindByTournamentIdAndGroupId(tournamentId, groupId);
     if (group == nullptr) {
         return std::unexpected("Group doesn't exist");
     }
-    if (group->Teams().size() + teams.size() >= 16) {
+    const auto tournament = tournamentRepository->ReadById(tournamentId.data());
+    int maxTeams = tournament->Format().MaxTeamsPerGroup();
+    if (group->Teams().size() + teams.size() > maxTeams) {
         return std::unexpected("Group at max capacity");
     }
     for (const auto& team : teams) {

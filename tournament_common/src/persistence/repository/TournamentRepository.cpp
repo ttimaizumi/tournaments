@@ -46,18 +46,24 @@ std::string TournamentRepository::Create (const domain::Tournament & entity) {
     return result[0]["id"].c_str();
 }
 
-std::string TournamentRepository::Update (const domain::Tournament & entity) {
-    return "id";
-}
 
-void TournamentRepository::Delete(std::string id) {
+std::string TournamentRepository::Update(const domain::Tournament &entity) {
     auto pooled = connectionProvider->Connection();
-    const auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
+    auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
+
+    nlohmann::json tournamentBody = entity;
 
     pqxx::work tx(*(connection->connection));
-    tx.exec(pqxx::prepped{"delete_tournament"}, id);
+    pqxx::result result = tx.exec(
+            pqxx::prepped{"update_tournament"},
+            pqxx::params{entity.Id(), tournamentBody.dump()}
+    );
     tx.commit();
+
+    return result[0]["id"].c_str();
 }
+
+void TournamentRepository::Delete(std::string id) { auto pooled = connectionProvider->Connection(); const auto connection = dynamic_cast<PostgresConnection*>(&*pooled); pqxx::work tx(*(connection->connection)); tx.exec(pqxx::prepped{"delete_tournament"}, id); tx.commit(); }
 
 std::vector<std::shared_ptr<domain::Tournament>> TournamentRepository::ReadAll() {
     std::vector<std::shared_ptr<domain::Tournament>> tournaments;
