@@ -1,7 +1,3 @@
-//
-// Created by root on 10/8/25.
-//
-
 #define JSON_CONTENT_TYPE "application/json"
 #define CONTENT_TYPE_HEADER "content-type"
 
@@ -9,114 +5,113 @@
 #include "controller/GroupController.hpp"
 #include "domain/Utilities.hpp"
 
-GroupController::GroupController(const std::shared_ptr<IGroupDelegate>& delegate) : groupDelegate(std::move(delegate)) {}
+GroupController::GroupController(const std::shared_ptr<IGroupDelegate>& delegate)
+    : groupDelegate(std::move(delegate)) {}
 
-GroupController::~GroupController()
-{
-}
+GroupController::~GroupController() = default;
 
 crow::response GroupController::GetGroups(const std::string& tournamentId) {
-    if (auto groups = groupDelegate->GetGroups(tournamentId)) {
-        nlohmann::json body = *groups;
-        crow::response response{crow::OK, body.dump()};
-        response.add_header(CONTENT_TYPE_HEADER, JSON_CONTENT_TYPE);
-        return response;
-    }
-    return crow::response{422};
+    auto groups = groupDelegate->GetGroups(tournamentId);
+    if (!groups.has_value())
+        return crow::response{crow::NOT_FOUND, groups.error()};
+
+    nlohmann::json body = *groups;
+    crow::response res{crow::OK, body.dump()};
+    res.add_header(CONTENT_TYPE_HEADER, JSON_CONTENT_TYPE);
+    return res;
 }
 
 crow::response GroupController::GetGroup(const std::string& tournamentId, const std::string& groupId) {
-    auto groupResult = groupDelegate->GetGroup(tournamentId, groupId);
+    auto result = groupDelegate->GetGroup(tournamentId, groupId);
+    if (!result.has_value())
+        return crow::response{crow::NOT_FOUND, result.error()};
 
-    if (!groupResult.has_value()) {
-        return crow::response{crow::INTERNAL_SERVER_ERROR, groupResult.error()};
-    }
-
-    auto group = groupResult.value();
-    if (group == nullptr) {
+    auto group = result.value();
+    if (group == nullptr)
         return crow::response{crow::NOT_FOUND, "Group not found"};
-    }
 
     nlohmann::json body = group;
-    crow::response response{crow::OK, body.dump()};
-    response.add_header(CONTENT_TYPE_HEADER, JSON_CONTENT_TYPE);
-    return response;
+    crow::response res{crow::OK, body.dump()};
+    res.add_header(CONTENT_TYPE_HEADER, JSON_CONTENT_TYPE);
+    return res;
 }
 
-crow::response GroupController::CreateGroup(const crow::request& request, const std::string& tournamentId) {
+crow::response GroupController::CreateGroup(const crow::request& req, const std::string& tournamentId) {
     try {
-        auto requestBody = nlohmann::json::parse(request.body);
-        domain::Group group = requestBody;
+        auto body = nlohmann::json::parse(req.body);
+        domain::Group group = body;
 
-        auto groupId = groupDelegate->CreateGroup(tournamentId, group);
-        crow::response response;
-        response.code = groupId ? crow::CREATED : 422;
-        if (groupId) response.add_header("location", *groupId);
-        return response;
-    } catch (const nlohmann::json::exception&) {
+        auto id = groupDelegate->CreateGroup(tournamentId, group);
+        if (id.has_value()) {
+            crow::response res{crow::CREATED};
+            res.add_header("location", id.value());
+            res.add_header(CONTENT_TYPE_HEADER, JSON_CONTENT_TYPE);
+            return res;
+        }
+
+        const std::string& err = id.error();
+        if (err.find("already exists") != std::string::npos)
+            return crow::response{409, err};
+        if (err.find("Tournament doesn't exist") != std::string::npos)
+            return crow::response{crow::NOT_FOUND, err};
+        return crow::response{422, err};
+    } catch (...) {
         return crow::response{422};
     }
 }
 
-crow::response GroupController::UpdateGroup(const crow::request& request, const std::string& tournamentId, const std::string& groupId) {
+crow::response GroupController::UpdateGroup(
+    const crow::request& req,
+    const std::string& tournamentId,
+    const std::string& groupId) {
     try {
-        auto requestBody = nlohmann::json::parse(request.body);
-        domain::Group group = requestBody;
-        group.Id() = groupId;
+        auto body = nlohmann::json::parse(req.body);
+        domain::Group group = body;
+        group.SetId(groupId);
 
         auto result = groupDelegate->UpdateGroup(tournamentId, group);
+        if (result.has_value())
+            return crow::response{crow::NO_CONTENT};
 
-        if (!result.has_value()) {
-            if (result.error().find("doesn't exist") != std::string::npos) {
-                return crow::response{crow::NOT_FOUND, result.error()};
-            }
-            return crow::response{422, result.error()};
-        }
-
-        return crow::response{crow::NO_CONTENT};
-    } catch (const nlohmann::json::exception&) {
+        const std::string& err = result.error();
+        if (err.find("doesn't exist") != std::string::npos)
+            return crow::response{crow::NOT_FOUND, err};
+        return crow::response{422, err};
+    } catch (...) {
         return crow::response{422};
     }
 }
 
 crow::response GroupController::RemoveGroup(const std::string& tournamentId, const std::string& groupId) {
     auto result = groupDelegate->RemoveGroup(tournamentId, groupId);
+    if (result.has_value())
+        return crow::response{crow::NO_CONTENT};
 
-    if (!result.has_value()) {
-        if (result.error().find("doesn't exist") != std::string::npos) {
-            return crow::response{crow::NOT_FOUND, result.error()};
-        }
-        return crow::response{422, result.error()};
-    }
-
-    return crow::response{crow::NO_CONTENT};
+    const std::string& err = result.error();
+    if (err.find("doesn't exist") != std::string::npos)
+        return crow::response{crow::NOT_FOUND, err};
+    return crow::response{422, err};
 }
 
-crow::response GroupController::UpdateTeams(
-        const crow::request& request,
-        const std::string& tournamentId,
-        const std::string& groupId
-) {
+crow::response GroupController::UpdateTeams(const crow::request& req, const std::string& tournamentId, const std::string& groupId) {
     try {
-        domain::Team team = nlohmann::json::parse(request.body).get<domain::Team>();
-        std::vector<domain::Team> teams = { team };
+        auto body = nlohmann::json::parse(req.body);
+        std::vector<domain::Team> teams;
+        if (body.is_array())
+            for (auto& t : body) teams.emplace_back(t.get<domain::Team>());
+        else
+            teams.emplace_back(body.get<domain::Team>());
 
-        const auto result = groupDelegate->UpdateTeams(tournamentId, groupId, teams);
-        crow::response response;
+        auto result = groupDelegate->UpdateTeams(tournamentId, groupId, teams);
+        if (result.has_value())
+            return crow::response{crow::NO_CONTENT};
 
-        if (result.has_value()) {
-            response.code = crow::status::CREATED;
-        } else {
-            response.code = 422;
-            response.body = result.error();
-        }
-
-        return response;
-
-    } catch (const nlohmann::json::exception& e) {
-        crow::response res{422};
-        res.body = std::string("JSON parse error: ") + e.what();
-        return res;
+        const std::string& err = result.error();
+        if (err.find("doesn't exist") != std::string::npos)
+            return crow::response{crow::NOT_FOUND, err};
+        return crow::response{422, err};
+    } catch (...) {
+        return crow::response{422};
     }
 }
 

@@ -58,7 +58,7 @@ std::vector<std::shared_ptr<domain::Group>> GroupRepository::ReadAll() {
     return teams;
 }
 
-std::vector<std::shared_ptr<domain::Group>> GroupRepository::FindByTournamentId(const std::string_view& tournamentId) {
+std::vector<std::shared_ptr<domain::Group>>GroupRepository::FindByTournamentId(const std::string_view& tournamentId) {
     auto pooled = connectionProvider->Connection();
     auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
 
@@ -67,14 +67,12 @@ std::vector<std::shared_ptr<domain::Group>> GroupRepository::FindByTournamentId(
     tx.commit();
 
     std::vector<std::shared_ptr<domain::Group>> groups;
-    for(auto row : result){
+    for (auto row : result) {
         nlohmann::json groupDocument = nlohmann::json::parse(row["document"].c_str());
         auto group = std::make_shared<domain::Group>(groupDocument);
-        group->Id() = result[0]["id"].c_str();
-
+        group->SetId(row["id"].c_str());
         groups.push_back(group);
     }
-
     return groups;
 }
 
@@ -87,7 +85,7 @@ std::shared_ptr<domain::Group> GroupRepository::FindByTournamentIdAndGroupId(con
     tx.commit();
     nlohmann::json groupDocument = nlohmann::json::parse(result[0]["document"].c_str());
     auto group = std::make_shared<domain::Group>(groupDocument);
-    group->Id() = result[0]["id"].c_str();
+    group->SetId(result[0]["id"].c_str());
 
     return group;
 }
@@ -104,7 +102,7 @@ std::shared_ptr<domain::Group> GroupRepository::FindByTournamentIdAndTeamId(cons
     }
     nlohmann::json groupDocument = nlohmann::json::parse(result[0]["document"].c_str());
     std::shared_ptr<domain::Group> group = std::make_shared<domain::Group>(groupDocument);
-    group->Id() = result[0]["id"].c_str();
+    group->SetId(result[0]["id"].c_str());
 
     return group;
 }

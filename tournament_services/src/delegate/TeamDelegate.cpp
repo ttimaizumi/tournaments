@@ -22,28 +22,22 @@ std::shared_ptr<domain::Team> TeamDelegate::GetTeam(std::string_view id) {
     }
 }
 
-std::expected<std::string, std::string> TeamDelegate::SaveTeam(const domain::Team& team){
-    try {
-        std::string id(teamRepository->Create(team));
-        if(id.empty()) {
-            return std::unexpected("Team already exists");
-        }
-        return id;
-    } catch(const std::exception& e) {
-        return std::unexpected(std::string("Failed to create team: ") + e.what());
+std::string_view TeamDelegate::SaveTeam(const domain::Team& team){
+    auto teamRepo = dynamic_cast<TeamRepository*>(teamRepository.get());
+
+    if(teamRepo && teamRepo->ExistsByName(team.Name)) {
+        return "";
     }
+
+    return teamRepository->Create(team);
 }
 
-std::expected<std::string, std::string> TeamDelegate::UpdateTeam(const domain::Team& team){
-    try {
-        std::string id(teamRepository->Update(team));
-        if(id.empty()) {
-            return std::unexpected("Team not found");
-        }
-        return id;
-    } catch(const std::exception& e) {
-        return std::unexpected(std::string("Failed to update team: ") + e.what());
+std::string_view TeamDelegate::UpdateTeam(const domain::Team& team){
+    auto teamRepo = dynamic_cast<TeamRepository*>(teamRepository.get());
+    if(teamRepo && !teamRepo->ExistsById(team.Id)) {
+        return "";
     }
-}
 
+    return teamRepository->Update(team);
+}
 
