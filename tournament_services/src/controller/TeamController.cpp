@@ -1,7 +1,3 @@
-//
-// Created by root on 9/27/25.
-//
-
 #define JSON_CONTENT_TYPE "application/json"
 #define CONTENT_TYPE_HEADER "content-type"
 
@@ -10,40 +6,53 @@
 
 #include "configuration/RouteDefinition.hpp"
 #include "domain/Utilities.hpp"
-#include "exception/Duplicate.hpp"
-#include "exception/NotFound.hpp"
-#include "exception/InvalidFormat.hpp"
+#include "exception/Error.hpp"
 #include <iostream>
 
-TeamController::TeamController(
-    const std::shared_ptr<ITeamDelegate>& teamDelegate)
-    : teamDelegate(teamDelegate) {}
+TeamController::TeamController(const std::shared_ptr<ITeamDelegate>& teamDelegate) : teamDelegate(teamDelegate) {}
+
+static int mapErrorToStatus(const Error err) {
+  switch (err) {
+    case Error::NOT_FOUND: return crow::NOT_FOUND;
+    case Error::INVALID_FORMAT: return crow::BAD_REQUEST;
+    case Error::DUPLICATE: return crow::CONFLICT;
+    default: return crow::INTERNAL_SERVER_ERROR;
+  }
+}
 
 crow::response TeamController::getTeam(const std::string& teamId) const {
   if (!std::regex_match(teamId, ID_VALUE)) {
     return crow::response{crow::BAD_REQUEST, "Invalid ID format"};
   }
-  try {
-    auto team = teamDelegate->GetTeam(teamId);
-    nlohmann::json body = team;
+
+  auto res = teamDelegate->GetTeam(teamId);
+  if (res) {
+    nlohmann::json body = *res;
     auto response = crow::response{crow::OK, body.dump()};
     response.add_header("Content-Type", "application/json");
     return response;
-  }
-  catch (const NotFoundException& e) {
-    return crow::response{crow::NOT_FOUND, e.what()};
-
-  } catch (const InvalidFormatException& e) {
-    return crow::response{crow::BAD_REQUEST, e.what()};
-
-  } catch (const std::exception& e) {
-    return crow::response{crow::INTERNAL_SERVER_ERROR, "Internal server error"};
+  } else {
+    return crow::response{ mapErrorToStatus(res.error()), "Error" };
   }
 }
 
 crow::response TeamController::getAllTeams() const {
-  nlohmann::json body = teamDelegate->GetAllTeams();
-  return crow::response{200, body.dump()};
+  auto res = teamDelegate->GetAllTeams();
+  if (res) {
+    nlohmann::json arr = nlohmann::json::array();
+    for (const auto& teamptr : *res) {
+      if (teamptr) {
+        arr.push_back(*teamptr);
+      } else {
+        arr.push_back(nullptr);
+      }
+    }
+    auto response = crow::response{crow::OK, arr.dump()};
+    response.add_header("Content-Type", "application/json");
+    return response;
+  } else {
+    return crow::response{ mapErrorToStatus(res.error()), "Error" };
+  }
 }
 
 crow::response TeamController::createTeam(const crow::request& request) const {
@@ -56,20 +65,14 @@ crow::response TeamController::createTeam(const crow::request& request) const {
   auto requestBody = nlohmann::json::parse(request.body);
   domain::Team team = requestBody;
 
-  try {
-    auto createdId = teamDelegate->CreateTeam(team);
+  auto res = teamDelegate->CreateTeam(team);
+  if (res) {
     response.code = crow::CREATED;
-    response.body = createdId;
-  } catch (const std::invalid_argument& e) {
-    response.code = crow::BAD_REQUEST;
-    response.body = e.what();
-
-  } catch (const DuplicateException& e) {
-    response.code = crow::CONFLICT;
-    response.body = e.what();
-  } catch (const std::exception& e) {
-    response.code = crow::INTERNAL_SERVER_ERROR;
-    response.body = "Internal server error";
+    response.body = *res;
+    response.add_header("Content-Type", "text/plain");
+  } else {
+    response.code = mapErrorToStatus(res.error());
+    response.body = "Error";
   }
 
   return response;
@@ -83,45 +86,24 @@ crow::response TeamController::updateTeam(const crow::request& request, const st
     return response;
   }
 
-  // Parse the body into a Team object
   auto requestBody = nlohmann::json::parse(request.body);
   domain::Team teamObj = requestBody;
 
-  // Validate the Team object (might not be necessary if nlohmann::json does this)
-  // try {
-  //   teamObj = ;
-  // } catch (const nlohmann::json::exception& e) {
-  //   response.code = crow::BAD_REQUEST;
-  //   response.body = "Request body does not match Team structure";
-  //   return response;
-  // }
-
-  // Stop users from changing the ID via the body
   if (!teamObj.Id.empty()) {
     response.code = crow::BAD_REQUEST;
     response.body = "ID is not editable";
     return response;
   }
-  // Set the ID to the path parameter to ensure they match
   teamObj.Id = teamId;
 
-  // Try to PATCH the team
-  try {
-    auto team = teamDelegate->UpdateTeam(teamObj);
+  auto res = teamDelegate->UpdateTeam(teamObj);
+  if (res) {
     response.code = crow::OK;
-    response.body = team;
-    
-  } catch (const NotFoundException& e) {
-    response.code = crow::NOT_FOUND;
-    response.body = e.what();
-
-  } catch (const InvalidFormatException& e) {
-    response.code = crow::BAD_REQUEST;
-    response.body = e.what();
-    
-  } catch (const std::exception& e) {
-    response.code = crow::INTERNAL_SERVER_ERROR;
-    response.body = "Internal server error";
+    response.body = *res;
+    response.add_header("Content-Type", "application/json");
+  } else {
+    response.code = mapErrorToStatus(res.error());
+    response.body = "Error";
   }
 
   return response;
@@ -136,21 +118,13 @@ crow::response TeamController::deleteTeam(const std::string& teamId) const {
     return response;
   }
 
-  try {
-    teamDelegate->DeleteTeam(teamId);
+  auto res = teamDelegate->DeleteTeam(teamId);
+  if (res) {
     response.code = crow::NO_CONTENT;
     response.body = "";
-    
-  } catch (const NotFoundException& e) {
-    response.code = crow::NOT_FOUND;
-    response.body = e.what();
-  } catch (const InvalidFormatException& e) {
-    response.code = crow::BAD_REQUEST;
-    response.body = e.what();
-
-  } catch (const std::exception& e) {
-    response.code = crow::INTERNAL_SERVER_ERROR;
-    response.body = "Internal server error";
+  } else {
+    response.code = mapErrorToStatus(res.error());
+    response.body = "Error";
   }
 
   return response;
