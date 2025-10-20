@@ -9,7 +9,8 @@ enum class Error
 {
     NOT_FOUND,
     DUPLICATE,
-    INVALID_FORMAT
+    INVALID_FORMAT,
+    UNKNOWN_ERROR
 };
 
 #endif //TOURNAMENTS_ERROR_HPP
