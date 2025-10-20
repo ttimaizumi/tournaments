@@ -85,3 +85,14 @@ std::vector<std::shared_ptr<domain::Tournament>> TournamentRepository::ReadAll()
 
     return tournaments;
 }
+
+bool TournamentRepository::ExistsByName(const std::string& name) {
+    auto pooled = connectionProvider->Connection();
+    auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
+
+    pqxx::work tx(*(connection->connection));
+    pqxx::result result = tx.exec(pqxx::prepped{"check_tournament_exists"}, name);
+    tx.commit();
+
+    return result[0]["count"].as<int>() > 0;
+}

@@ -17,11 +17,23 @@
 TournamentController::TournamentController(std::shared_ptr<ITournamentDelegate> delegate) : tournamentDelegate(std::move(delegate)) {}
 
 crow::response TournamentController::CreateTournament(const crow::request &request) const {
+    crow::response response;
+
+    if(!nlohmann::json::accept(request.body)) {
+        response.code = crow::BAD_REQUEST;
+        return response;
+    }
+
     nlohmann::json body = nlohmann::json::parse(request.body);
     const std::shared_ptr<domain::Tournament> tournament = std::make_shared<domain::Tournament>(body);
 
     const std::string id = tournamentDelegate->CreateTournament(tournament);
-    crow::response response;
+
+    if(id.empty()) {
+        response.code = crow::CONFLICT; // 409
+        return response;
+    }
+
     response.code = crow::CREATED;
     response.add_header("location", id);
     return response;

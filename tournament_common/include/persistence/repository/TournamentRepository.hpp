@@ -20,6 +20,8 @@ public:
     std::string Update (const domain::Tournament & entity) override;
     void Delete(std::string id) override;
     std::vector<std::shared_ptr<domain::Tournament>> ReadAll() override;
+
+    bool ExistsByName(const std::string& name);
 };
 
 #endif //TOURNAMENTS_TOURNAMENTREPOSITORY_HPP

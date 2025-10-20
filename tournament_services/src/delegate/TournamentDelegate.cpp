@@ -5,23 +5,31 @@
 #include <memory>
 
 #include "delegate/TournamentDelegate.hpp"
-
 #include "persistence/repository/IRepository.hpp"
+#include "persistence/repository/TournamentRepository.hpp"
 
 TournamentDelegate::TournamentDelegate(std::shared_ptr<IRepository<domain::Tournament, std::string> > repository, std::shared_ptr<QueueMessageProducer> producer) : tournamentRepository(std::move(repository)), producer(std::move(producer)) {
 }
 
 std::string TournamentDelegate::CreateTournament(std::shared_ptr<domain::Tournament> tournament) {
-    //fill groups according to max groups
-    std::shared_ptr<domain::Tournament> tp = std::move(tournament);
+    // Verificar si el torneo ya existe
+    auto tournamentRepo = dynamic_cast<TournamentRepository*>(tournamentRepository.get());
+    if(tournamentRepo && tournamentRepo->ExistsByName(tournament->Name())) {
+        return ""; // Retornar vacío para indicar conflicto
+    }
+
+    // Comentado: llenar grupos según max groups
+    // std::shared_ptr<domain::Tournament> tp = std::move(tournament);
     // for (auto[i, g] = std::tuple{0, 'A'}; i < tp->Format().NumberOfGroups(); i++,g++) {
     //     tp->Groups().push_back(domain::Group{std::format("Tournament {}", g)});
     // }
 
-    std::string id = tournamentRepository->Create(*tp);
+    std::string id = tournamentRepository->Create(*tournament);
+
+    // Solo enviar mensaje si se creó exitosamente
     producer->SendMessage(id, "tournament.created");
 
-    //if groups are completed also create matches
+    // if groups are completed also create matches
 
     return id;
 }
