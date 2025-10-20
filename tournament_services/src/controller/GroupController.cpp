@@ -18,29 +18,14 @@ GroupController::~GroupController()
 {
 }
 
-static crow::response createErrorResponse(const Error err, const std::string& message = "Error") {
-  crow::response response;
-  response.body = message;
-  
+static int mapErrorToStatus(const Error err) {
   switch (err) {
-    case Error::NOT_FOUND: 
-      response.code = crow::NOT_FOUND;
-      break;
-    case Error::INVALID_FORMAT: 
-      response.code = crow::BAD_REQUEST;
-      break;
-    case Error::DUPLICATE: 
-      response.code = crow::CONFLICT;
-      break;
-    case Error::UNPROCESSABLE_ENTITY: 
-      response.code = 422;
-      break;
-    default: 
-      response.code = crow::INTERNAL_SERVER_ERROR;
-      break;
+    case Error::NOT_FOUND: return crow::NOT_FOUND;
+    case Error::INVALID_FORMAT: return crow::BAD_REQUEST;
+    case Error::DUPLICATE: return crow::CONFLICT;
+    case Error::UNPROCESSABLE_ENTITY: return 422;
+    default: return crow::INTERNAL_SERVER_ERROR;
   }
-  
-  return response;
 }
 
 crow::response GroupController::GetGroups(const std::string& tournamentId){
