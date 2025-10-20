@@ -51,3 +51,55 @@ configure_file(
         ${CMAKE_BINARY_DIR}/${PROJECT_NAME}/configuration.json
         COPYONLY
 )
+
+option(BUILD_TESTS "Build unit tests" ON)
+option(BUILD_TESTS_ONLY "Configure only unit tests (skip service deps)" OFF)
+
+set(SERVICES_SOURCES
+        src/delegate/TeamDelegate.cpp
+        src/delegate/TournamentDelegate.cpp
+        src/delegate/GroupDelegate.cpp
+        src/controller/TournamentController.cpp
+        src/controller/TeamController.cpp
+        src/controller/GroupController.cpp
+)
+
+if (NOT BUILD_TESTS_ONLY)
+    find_package(Crow CONFIG REQUIRED)
+    find_package(libpqxx CONFIG REQUIRED)
+    find_package(nlohmann_json CONFIG REQUIRED)
+    find_path(HYPODERMIC_INCLUDE_DIRS "Hypodermic/ActivatedRegistrationInfo.h")
+endif()
+
+include_directories(include)
+
+if (NOT BUILD_TESTS_ONLY)
+    add_executable(${PROJECT_NAME}
+            main.cpp
+            ${SERVICES_SOURCES}
+    )
+
+    target_compile_definitions(${PROJECT_NAME} PRIVATE ASIO_STANDALONE)
+
+    target_link_libraries(${PROJECT_NAME} PUBLIC
+            Crow::Crow
+            asio::asio
+            nlohmann_json::nlohmann_json
+            libpqxx::pqxx
+            unofficial::activemq-cpp::activemq-cpp
+            tournament_common
+    )
+
+    target_include_directories(${PROJECT_NAME} INTERFACE ${HYPODERMIC_INCLUDE_DIRS})
+
+    configure_file(
+            ${CMAKE_SOURCE_DIR}/${PROJECT_NAME}/configuration.json
+            ${CMAKE_BINARY_DIR}/${PROJECT_NAME}/configuration.json
+            COPYONLY
+    )
+endif()
+
+if (BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()

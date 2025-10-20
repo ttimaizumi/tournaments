@@ -6,3 +6,13 @@
 /Testing/
 /CMakePresets.json
 /out/
+/build/
+/build-tests/
+**/CMakeFiles/
+/CMakeCache.txt
+*.o
+*.a
+*.so
+*.dll
+*.exe
+*.out

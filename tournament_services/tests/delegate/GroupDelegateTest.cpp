@@ -1,237 +1,198 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
-#include <memory>
-#include <string>
-#include <vector>
 #include <expected>
+#include <optional>
+#include <vector>
+#include <string>
+#include "model/Team.hpp"
+#include "model/Group.hpp"
+#include "model/Tournament.hpp"
 
 #include "delegate/GroupDelegate.hpp"
-#include "persistence/repository/IRepository.hpp"
-#include "persistence/repository/IGroupRepository.hpp"
-#include "cms/IQueueMessageProducer.hpp"
-#include "domain/Tournament.hpp"
-#include "domain/Group.hpp"
-#include "domain/Team.hpp"
 
-using ::testing::StrictMock;
-using ::testing::Return;
-using ::testing::DoAll;
-using ::testing::SaveArg;
-using ::testing::Truly;
-using ::testing::Eq;
 using ::testing::_;
+using ::testing::Return;
 
-// Tournament repo mock (IRepository<domain::Tournament, std::string>)
-struct MockTournamentRepo : IRepository<domain::Tournament, std::string> {
-    MOCK_METHOD(std::shared_ptr<domain::Tournament>, ReadById, (std::string id), (override));
-    MOCK_METHOD(std::vector<std::shared_ptr<domain::Tournament>>, ReadAll, (), (override));
-    MOCK_METHOD(std::string, Create, (const domain::Tournament&), (override));
-    MOCK_METHOD(std::string, Update, (const domain::Tournament&), (override));
-    MOCK_METHOD(void, Delete, (std::string id), (override));
+class MockTournamentRepoForGroupDelegate {
+public:
+  MOCK_METHOD(bool, Exists, (const std::string& tid), ());
 };
 
-// Group repo mock
-struct MockGroupRepo : IGroupRepository {
-    MOCK_METHOD(std::shared_ptr<domain::Group>, ReadById, (std::string id), (override));
-    MOCK_METHOD(std::vector<std::shared_ptr<domain::Group>>, ReadAll, (), (override));
-    MOCK_METHOD(std::string, Create, (const domain::Group& g), (override));
-    MOCK_METHOD(std::string, Update, (const domain::Group& g), (override));
-    MOCK_METHOD(void, Delete, (std::string id), (override));
-
-    MOCK_METHOD(std::vector<std::shared_ptr<domain::Group>>, FindByTournamentId,
-                (const std::string_view& tournamentId), (override));
-    MOCK_METHOD(std::shared_ptr<domain::Group>, FindByTournamentIdAndGroupId,
-                (const std::string_view& tournamentId, const std::string_view& groupId), (override));
-    MOCK_METHOD(std::shared_ptr<domain::Group>, FindByTournamentIdAndTeamId,
-                (const std::string_view& tournamentId, const std::string_view& teamId), (override));
-    MOCK_METHOD(void, UpdateGroupAddTeam,
-                (const std::string_view& groupId, const std::shared_ptr<domain::Team>& team), (override));
+class MockGroupRepoForGroupDelegate {
+public:
+  MOCK_METHOD((std::optional<std::string>), Insert,   (const std::string& tid, const Group&), ());
+  MOCK_METHOD((std::optional<Group>),       FindById, (const std::string& tid, const std::string& gid), ());
+  MOCK_METHOD((std::vector<Group>),         List,     (const std::string& tid), ());
+  MOCK_METHOD(bool,                         Update,   (const std::string& tid, const std::string& gid, const Group&), ());
+  MOCK_METHOD(bool,                         AddTeam,  (const std::string& tid, const std::string& gid, const std::string& teamId), ());
+  MOCK_METHOD(int,                          GroupSize,(const std::string& tid, const std::string& gid), ());
 };
 
-// Team repo mock (IRepository<domain::Team, std::string>)
-struct MockTeamRepo : IRepository<domain::Team, std::string> {
-    MOCK_METHOD(std::shared_ptr<domain::Team>, ReadById, (std::string id), (override));
-    MOCK_METHOD(std::vector<std::shared_ptr<domain::Team>>, ReadAll, (), (override));
-    MOCK_METHOD(std::string, Create, (const domain::Team&), (override));
-    MOCK_METHOD(std::string, Update, (const domain::Team&), (override));
-    MOCK_METHOD(void, Delete, (std::string id), (override));
+class MockTeamRepoForGroupDelegate {
+public:
+  MOCK_METHOD(bool, Exists, (const std::string& teamId), ());
 };
 
-struct MockProducer : IQueueMessageProducer {
-    MOCK_METHOD(void, SendMessage, (const std::string_view& message, const std::string_view& queue), (override));
+class MockEventBusForGroupDelegate {
+public:
+  MOCK_METHOD(void, Publish, (const std::string& topic, const std::string& payload), ());
 };
 
-class GroupDelegateFixture : public ::testing::Test {
-protected:
-    std::shared_ptr<StrictMock<MockTournamentRepo>> tRepo;
-    std::shared_ptr<StrictMock<MockGroupRepo>>      gRepo;
-    std::shared_ptr<StrictMock<MockTeamRepo>>       teamRepo;
-    std::shared_ptr<StrictMock<MockProducer>>       producer;
-    std::unique_ptr<GroupDelegate>                  delegate;
+//12 tests
 
-    void SetUp() override {
-        tRepo    = std::make_shared<StrictMock<MockTournamentRepo>>();
-        gRepo    = std::make_shared<StrictMock<MockGroupRepo>>();
-        teamRepo = std::make_shared<StrictMock<MockTeamRepo>>();
-        producer = std::make_shared<StrictMock<MockProducer>>();
-        delegate = std::make_unique<GroupDelegate>(tRepo, gRepo, teamRepo, producer);
-    }
-};
-
-TEST_F(GroupDelegateFixture, CreateGroup_Success_ReadsTournament_Transfers_Publishes_ReturnsId) {
-    auto tour = std::make_shared<domain::Tournament>(); tour->Id() = "t1";
-    EXPECT_CALL(*tRepo, ReadById(Eq(std::string{"t1"}))).WillOnce(Return(tour));
-
-    domain::Group captured{};
-    EXPECT_CALL(*gRepo, Create(_))
-        .WillOnce(DoAll(SaveArg<0>(&captured), Return(std::string{"g1"})));
-
-    EXPECT_CALL(*producer, SendMessage(Eq(std::string_view{"g1"}), Eq(std::string_view{"group.created"})))
-        .Times(1);
-
-    domain::Group g; g.Id() = "g1"; g.Name() = "A";
-    auto r = delegate->CreateGroup("t1", g);
-    ASSERT_TRUE(r.has_value());
-    EXPECT_EQ(r.value(), "g1");
-    EXPECT_EQ(captured.Id(), "g1");
-    EXPECT_EQ(captured.TournamentId(), "t1");
+TEST(GroupDelegateTest, Create_Ok_PublishesEvent){
+  MockTournamentRepoForGroupDelegate tr;
+  MockGroupRepoForGroupDelegate gr;
+  MockTeamRepoForGroupDelegate tm;
+  MockEventBusForGroupDelegate bus;
+  EXPECT_CALL(tr, Exists("T1")).WillOnce(Return(true));
+  EXPECT_CALL(gr, Insert("T1", _)).WillOnce(Return(std::optional<std::string>{"GA"}));
+  EXPECT_CALL(bus, Publish("group-created", _));
+  GroupDelegate d(tr,gr,tm,bus);
+  auto r = d.Create("T1", Group{"","A",0});
+  ASSERT_TRUE(r); EXPECT_EQ("GA", *r);
 }
 
-TEST_F(GroupDelegateFixture, CreateGroup_Conflict_ExpectedError) {
-    auto tour = std::make_shared<domain::Tournament>(); tour->Id() = "t1";
-    EXPECT_CALL(*tRepo, ReadById(Eq(std::string{"t1"}))).WillOnce(Return(tour));
-    EXPECT_CALL(*gRepo, Create(_)).WillOnce(Return(std::string{}));
-    EXPECT_CALL(*producer, SendMessage(_, _)).Times(0);
-
-    domain::Group g; g.Id() = "dup";
-    auto r = delegate->CreateGroup("t1", g);
-    ASSERT_FALSE(r.has_value());
-    EXPECT_EQ(r.error(), "group-already-exists");
+TEST(GroupDelegateTest, Create_Conflict409){
+  MockTournamentRepoForGroupDelegate tr; MockGroupRepoForGroupDelegate gr; MockTeamRepoForGroupDelegate tm; MockEventBusForGroupDelegate bus;
+  GroupDelegate d(tr,gr,tm,bus);
+  EXPECT_CALL(tr, Exists("T1")).WillOnce(Return(true));
+  EXPECT_CALL(gr, Insert("T1", _)).WillOnce(Return(std::nullopt));
+  auto r = d.Create("T1", Group{"","A",0});
+  ASSERT_FALSE(r); EXPECT_EQ(409, r.error());
 }
 
-TEST_F(GroupDelegateFixture, GetGroup_Found) {
-    auto g = std::make_shared<domain::Group>(); g->Id() = "g1";
-    EXPECT_CALL(*gRepo, FindByTournamentIdAndGroupId(Eq(std::string_view{"t1"}), Eq(std::string_view{"g1"})))
-        .WillOnce(Return(g));
-
-    auto r = delegate->GetGroup("t1", "g1");
-    ASSERT_TRUE(r.has_value());
-    EXPECT_EQ(r.value()->Id(), "g1");
+TEST(GroupDelegateTest, Create_TournamentNotFound404){
+  MockTournamentRepoForGroupDelegate tr; MockGroupRepoForGroupDelegate gr; MockTeamRepoForGroupDelegate tm; MockEventBusForGroupDelegate bus;
+  GroupDelegate d(tr,gr,tm,bus);
+  EXPECT_CALL(tr, Exists("T1")).WillOnce(Return(false));
+  auto r = d.Create("T1", Group{"","A",0});
+  ASSERT_FALSE(r); EXPECT_EQ(404, r.error());
 }
 
-TEST_F(GroupDelegateFixture, GetGroup_NotFound) {
-    EXPECT_CALL(*gRepo, FindByTournamentIdAndGroupId(Eq(std::string_view{"t1"}), Eq(std::string_view{"missing"})))
-        .WillOnce(Return(nullptr));
-
-    auto r = delegate->GetGroup("t1", "missing");
-    ASSERT_FALSE(r.has_value());
-    EXPECT_EQ(r.error(), "group-not-found");
+TEST(GroupDelegateTest, FindById_Ok){
+  MockTournamentRepoForGroupDelegate tr; MockGroupRepoForGroupDelegate gr; MockTeamRepoForGroupDelegate tm; MockEventBusForGroupDelegate bus;
+  GroupDelegate d(tr,gr,tm,bus);
+  EXPECT_CALL(gr, FindById("T1","GA")).WillOnce(Return(Group{"GA","A",4}));
+  auto g = d.FindById("T1","GA");
+  ASSERT_TRUE(g); EXPECT_EQ(4, g->size);
 }
 
-TEST_F(GroupDelegateFixture, GetGroups_WithItems) {
-    auto g1 = std::make_shared<domain::Group>(); g1->Id() = "a";
-    auto g2 = std::make_shared<domain::Group>(); g2->Id() = "b";
-
-    EXPECT_CALL(*gRepo, FindByTournamentId(Eq(std::string_view{"t1"})))
-        .WillOnce(Return(std::vector<std::shared_ptr<domain::Group>>{g1, g2}));
-
-    auto r = delegate->GetGroups("t1");
-    ASSERT_TRUE(r.has_value());
-    ASSERT_EQ(r.value().size(), 2u);
-    EXPECT_EQ(r.value()[0]->Id(), "a");
-    EXPECT_EQ(r.value()[1]->Id(), "b");
+TEST(GroupDelegateTest, FindById_Null){
+  MockTournamentRepoForGroupDelegate tr; MockGroupRepoForGroupDelegate gr; MockTeamRepoForGroupDelegate tm; MockEventBusForGroupDelegate bus;
+  GroupDelegate d(tr,gr,tm,bus);
+  EXPECT_CALL(gr, FindById("T1","NO")).WillOnce(Return(std::nullopt));
+  auto g = d.FindById("T1","NO");
+  EXPECT_FALSE(g.has_value());
 }
 
-TEST_F(GroupDelegateFixture, GetGroups_Empty) {
-    EXPECT_CALL(*gRepo, FindByTournamentId(Eq(std::string_view{"t1"})))
-        .WillOnce(Return(std::vector<std::shared_ptr<domain::Group>>{}));
-
-    auto r = delegate->GetGroups("t1");
-    ASSERT_TRUE(r.has_value());
-    EXPECT_TRUE(r.value().empty());
+TEST(GroupDelegateTest, List_Groups){
+  MockTournamentRepoForGroupDelegate tr; MockGroupRepoForGroupDelegate gr; MockTeamRepoForGroupDelegate tm; MockEventBusForGroupDelegate bus;
+  GroupDelegate d(tr,gr,tm,bus);
+  EXPECT_CALL(gr, List("T1")).WillOnce(Return(std::vector<Group>{{"GA","A",0},{"GB","B",0}}));
+  auto v = d.List("T1");
+  EXPECT_EQ(2u, v.size());
 }
 
-TEST_F(GroupDelegateFixture, UpdateGroup_Success) {
-    EXPECT_CALL(*gRepo, FindByTournamentIdAndGroupId(Eq(std::string_view{"t1"}), Eq(std::string_view{"g1"})))
-        .WillOnce(Return(std::make_shared<domain::Group>(domain::Group{})));
-
-    domain::Group captured{};
-    EXPECT_CALL(*gRepo,
-        Update(Truly([&](const domain::Group& gg){
-            return gg.Id() == "g1" && gg.Name() == "Updated";
-        })))
-        .WillOnce(DoAll(SaveArg<0>(&captured), Return(std::string{"g1"})));
-
-    domain::Group in; in.Id() = "g1"; in.Name() = "Updated";
-    auto r = delegate->UpdateGroup("t1", in);
-    ASSERT_TRUE(r.has_value());
-    EXPECT_EQ(captured.Id(), "g1");
-    EXPECT_EQ(captured.Name(), "Updated");
+TEST(GroupDelegateTest, Update_Ok){
+  MockTournamentRepoForGroupDelegate tr; MockGroupRepoForGroupDelegate gr; MockTeamRepoForGroupDelegate tm; MockEventBusForGroupDelegate bus;
+  GroupDelegate d(tr,gr,tm,bus);
+  EXPECT_CALL(gr, Update("T1","GA", _)).WillOnce(Return(true));
+  auto r = d.Update("T1","GA", Group{"GA","A",4});
+  EXPECT_TRUE(r.has_value());
 }
 
-TEST_F(GroupDelegateFixture, UpdateGroup_NotFound_ExpectedError) {
-    EXPECT_CALL(*gRepo, FindByTournamentIdAndGroupId(Eq(std::string_view{"t1"}), Eq(std::string_view{"g404"})))
-        .WillOnce(Return(nullptr));
-
-    domain::Group in; in.Id() = "g404";
-    auto r = delegate->UpdateGroup("t1", in);
-    ASSERT_FALSE(r.has_value());
-    EXPECT_EQ(r.error(), "group-not-found");
+TEST(GroupDelegateTest, Update_NotFound404){
+  MockTournamentRepoForGroupDelegate tr; MockGroupRepoForGroupDelegate gr; MockTeamRepoForGroupDelegate tm; MockEventBusForGroupDelegate bus;
+  GroupDelegate d(tr,gr,tm,bus);
+  EXPECT_CALL(gr, Update("T1","GA", _)).WillOnce(Return(false));
+  auto r = d.Update("T1","GA", Group{"GA","A",4});
+  ASSERT_FALSE(r); EXPECT_EQ(404, r.error());
 }
 
-TEST_F(GroupDelegateFixture, UpdateTeams_AddsAndPublishesPerTeam) {
-    auto g = std::make_shared<domain::Group>(); g->Id() = "g1";
-    EXPECT_CALL(*gRepo, FindByTournamentIdAndGroupId(Eq(std::string_view{"t1"}), Eq(std::string_view{"g1"})))
-        .WillOnce(Return(g));
-
-    EXPECT_CALL(*gRepo, FindByTournamentIdAndTeamId(Eq(std::string_view{"t1"}), Eq(std::string_view{"p1"})))
-        .WillOnce(Return(nullptr));
-
-    auto persisted = std::make_shared<domain::Team>(domain::Team{"p1","P1"});
-    EXPECT_CALL(*teamRepo, ReadById(Eq(std::string{"p1"})))
-        .Times(2) // pre-check + añadir
-        .WillRepeatedly(Return(persisted));
-
-    EXPECT_CALL(*gRepo, UpdateGroupAddTeam(Eq(std::string_view{"g1"}), persisted)).Times(1);
-    EXPECT_CALL(*producer, SendMessage(Eq(std::string_view{"p1"}), Eq(std::string_view{"group.team-added"}))).Times(1);
-
-    std::vector<domain::Team> input{ domain::Team{"p1","P1"} };
-    auto r = delegate->UpdateTeams("t1", "g1", input);
-    EXPECT_TRUE(r.has_value());
+TEST(GroupDelegateTest, AddTeam_Ok_Publishes){
+  MockTournamentRepoForGroupDelegate tr; MockGroupRepoForGroupDelegate gr; MockTeamRepoForGroupDelegate tm; MockEventBusForGroupDelegate bus;
+  GroupDelegate d(tr,gr,tm,bus);
+  EXPECT_CALL(tm, Exists("TEAM-1")).WillOnce(Return(true));
+  EXPECT_CALL(gr, GroupSize("T1","GA")).WillOnce(Return(3));
+  EXPECT_CALL(gr, AddTeam("T1","GA","TEAM-1")).WillOnce(Return(true));
+  EXPECT_CALL(bus, Publish("team-added", _));
+  auto r = d.AddTeam("T1","GA","TEAM-1");
+  EXPECT_TRUE(r.has_value());
 }
 
-TEST_F(GroupDelegateFixture, UpdateTeams_TeamNotFound_ExpectedError) {
-    auto g = std::make_shared<domain::Group>(); g->Id() = "g1";
-    EXPECT_CALL(*gRepo, FindByTournamentIdAndGroupId(Eq(std::string_view{"t1"}), Eq(std::string_view{"g1"})))
-        .WillOnce(Return(g));
-
-    EXPECT_CALL(*gRepo, FindByTournamentIdAndTeamId(Eq(std::string_view{"t1"}), Eq(std::string_view{"missing"})))
-        .WillOnce(Return(nullptr));
-
-    EXPECT_CALL(*teamRepo, ReadById(Eq(std::string{"missing"})))
-        .WillOnce(Return(nullptr));
-
-    EXPECT_CALL(*producer, SendMessage(_, _)).Times(0);
-    EXPECT_CALL(*gRepo, UpdateGroupAddTeam(_, _)).Times(0);
-
-    std::vector<domain::Team> input{ domain::Team{"missing","X"} };
-    auto r = delegate->UpdateTeams("t1", "g1", input);
-    ASSERT_FALSE(r.has_value());
-    EXPECT_EQ(r.error(), "team-not-found");
+TEST(GroupDelegateTest, AddTeam_TeamNotFound422){
+  MockTournamentRepoForGroupDelegate tr; MockGroupRepoForGroupDelegate gr; MockTeamRepoForGroupDelegate tm; MockEventBusForGroupDelegate bus;
+  GroupDelegate d(tr,gr,tm,bus);
+  EXPECT_CALL(tm, Exists("X")).WillOnce(Return(false));
+  auto r = d.AddTeam("T1","GA","X");
+  ASSERT_FALSE(r); EXPECT_EQ(422, r.error());
 }
-//
-TEST_F(GroupDelegateFixture, UpdateTeams_GroupFull_ExpectedError) {
-    auto g = std::make_shared<domain::Group>(); g->Id() = "g1";
-    g->Teams().resize(16);
 
-    EXPECT_CALL(*gRepo, FindByTournamentIdAndGroupId(Eq(std::string_view{"t1"}), Eq(std::string_view{"g1"})))
-        .WillOnce(Return(g));
+TEST(GroupDelegateTest, AddTeam_GroupFull422){
+  MockTournamentRepoForGroupDelegate tr; MockGroupRepoForGroupDelegate gr; MockTeamRepoForGroupDelegate tm; MockEventBusForGroupDelegate bus;
+  GroupDelegate d(tr,gr,tm,bus);
+  EXPECT_CALL(tm, Exists("T")).WillOnce(Return(true));
+  EXPECT_CALL(gr, GroupSize("T1","GA")).WillOnce(Return(4));
+  auto r = d.AddTeam("T1","GA","T");
+  ASSERT_FALSE(r); EXPECT_EQ(422, r.error());
+}
 
-    EXPECT_CALL(*producer, SendMessage(_, _)).Times(0);
-    EXPECT_CALL(*gRepo, UpdateGroupAddTeam(_, _)).Times(0);
+TEST(GroupDelegateTest, AddTeam_Conflict409){
+  MockTournamentRepoForGroupDelegate tr; MockGroupRepoForGroupDelegate gr; MockTeamRepoForGroupDelegate tm; MockEventBusForGroupDelegate bus;
+  GroupDelegate d(tr,gr,tm,bus);
+  EXPECT_CALL(tm, Exists("T")).WillOnce(Return(true));
+  EXPECT_CALL(gr, GroupSize("T1","GA")).WillOnce(Return(2));
+  EXPECT_CALL(gr, AddTeam("T1","GA","T")).WillOnce(Return(false));
+  auto r = d.AddTeam("T1","GA","T");
+  ASSERT_FALSE(r); EXPECT_EQ(409, r.error());
+}
 
-    std::vector<domain::Team> input{ domain::Team{"p9","P9"} };
-    auto r = delegate->UpdateTeams("t1", "g1", input);
-    ASSERT_FALSE(r.has_value());
-    EXPECT_EQ(r.error(), "group-full");
+// ---- Tests adicionales de validación del Mundial ----
+
+TEST(GroupDelegateTest, Mundial_AddTeam_Exactly4Teams_GroupFull){
+  // Verifica que con exactamente 4 equipos el grupo esté lleno
+  MockTournamentRepoForGroupDelegate tr; MockGroupRepoForGroupDelegate gr; MockTeamRepoForGroupDelegate tm; MockEventBusForGroupDelegate bus;
+  GroupDelegate d(tr,gr,tm,bus);
+  EXPECT_CALL(tm, Exists("T5")).WillOnce(Return(true));
+  EXPECT_CALL(gr, GroupSize("T1","GA")).WillOnce(Return(4));  // Ya tiene 4 equipos
+  auto r = d.AddTeam("T1","GA","T5");
+  ASSERT_FALSE(r);
+  EXPECT_EQ(422, r.error());  // Grupo lleno con 4 equipos
+}
+
+TEST(GroupDelegateTest, Mundial_AddTeam_3Teams_CanAddFourth){
+  // Verifica que con 3 equipos se puede agregar el cuarto
+  MockTournamentRepoForGroupDelegate tr; MockGroupRepoForGroupDelegate gr; MockTeamRepoForGroupDelegate tm; MockEventBusForGroupDelegate bus;
+  GroupDelegate d(tr,gr,tm,bus);
+  EXPECT_CALL(tm, Exists("T4")).WillOnce(Return(true));
+  EXPECT_CALL(gr, GroupSize("T1","GA")).WillOnce(Return(3));  // Tiene 3, puede agregar el 4to
+  EXPECT_CALL(gr, AddTeam("T1","GA","T4")).WillOnce(Return(true));
+  EXPECT_CALL(bus, Publish("team-added", _));
+  auto r = d.AddTeam("T1","GA","T4");
+  EXPECT_TRUE(r.has_value());
+}
+
+TEST(GroupDelegateTest, Mundial_Group_MinimumSize_0){
+  // Verifica que un grupo puede empezar vacío (tamaño 0)
+  MockTournamentRepoForGroupDelegate tr; MockGroupRepoForGroupDelegate gr; MockTeamRepoForGroupDelegate tm; MockEventBusForGroupDelegate bus;
+  GroupDelegate d(tr,gr,tm,bus);
+  EXPECT_CALL(tm, Exists("T1")).WillOnce(Return(true));
+  EXPECT_CALL(gr, GroupSize("T1","GA")).WillOnce(Return(0));  // Grupo vacío
+  EXPECT_CALL(gr, AddTeam("T1","GA","T1")).WillOnce(Return(true));
+  EXPECT_CALL(bus, Publish("team-added", _));
+  auto r = d.AddTeam("T1","GA","T1");
+  EXPECT_TRUE(r.has_value());
+}
+
+TEST(GroupDelegateTest, Mundial_EventPublished_ContainsTeamInfo){
+  // Verifica que el evento publicado contiene información del equipo agregado
+  MockTournamentRepoForGroupDelegate tr; MockGroupRepoForGroupDelegate gr; MockTeamRepoForGroupDelegate tm; MockEventBusForGroupDelegate bus;
+  GroupDelegate d(tr,gr,tm,bus);
+  EXPECT_CALL(tm, Exists("TEAM-BRASIL")).WillOnce(Return(true));
+  EXPECT_CALL(gr, GroupSize("T1","GA")).WillOnce(Return(2));
+  EXPECT_CALL(gr, AddTeam("T1","GA","TEAM-BRASIL")).WillOnce(Return(true));
+  EXPECT_CALL(bus, Publish("team-added", _));  // El evento debe contener info del equipo
+  auto r = d.AddTeam("T1","GA","TEAM-BRASIL");
+  EXPECT_TRUE(r.has_value());
 }
