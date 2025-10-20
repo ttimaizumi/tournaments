@@ -60,7 +60,7 @@ std::expected<std::string, Error> TeamDelegate::CreateTeam(
       return std::unexpected(Error::UNKNOWN_ERROR);
     }
     return std::string{id_view};
-    
+
   } catch (const pqxx::unique_violation& e) {
     if (e.sqlstate() == "23505") {
       return std::unexpected(Error::DUPLICATE);
