@@ -15,7 +15,11 @@ std::vector<std::shared_ptr<domain::Team>> TeamDelegate::GetAllTeams() {
 }
 
 std::shared_ptr<domain::Team> TeamDelegate::GetTeam(std::string_view id) {
-    return teamRepository->ReadById(id.data());
+    try {
+        return teamRepository->ReadById(id.data());
+    } catch(...) {
+        return nullptr;
+    }
 }
 
 std::string_view TeamDelegate::SaveTeam(const domain::Team& team){

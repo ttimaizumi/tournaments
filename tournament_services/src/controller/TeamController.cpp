@@ -72,7 +72,7 @@ crow::response TeamController::UpdateTeam(const crow::request& request, const st
     std::string updatedId(teamDelegate->UpdateTeam(team));
 
     if(updatedId.empty()) {
-        return crow::response{crow::NOT_FOUND}; 
+        return crow::response{crow::NOT_FOUND};
     }
 
     return crow::response{crow::NO_CONTENT};
