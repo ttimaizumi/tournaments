@@ -7,96 +7,118 @@
 
 #include "configuration/RouteDefinition.hpp"
 #include "controller/TournamentController.hpp"
+#include "exception/Error.hpp"
+#include "domain/Tournament.hpp"
+#include "domain/Utilities.hpp"
 
 #include <string>
 #include <utility>
-#include "domain/Tournament.hpp"
-#include "domain/Utilities.hpp"
-#include "configuration/RouteDefinition.hpp"
-#include "exception/Duplicate.hpp"
-#include "exception/NotFound.hpp"
-
-#include "exception/InvalidFormat.hpp"
+#include <nlohmann/json.hpp>
 #include <iostream>
 
+TournamentController::TournamentController(const std::shared_ptr<ITournamentDelegate>& delegate)
+    : tournamentDelegate(delegate) {}
 
-TournamentController::TournamentController(std::shared_ptr<ITournamentDelegate> delegate) : tournamentDelegate(std::move(delegate)) {}
+TournamentController::~TournamentController() {}
 
-crow::response TournamentController::getTournament(const std::string& tournamentId) const
-{
-    if(!std::regex_match(tournamentId, ID_VALUE_TOURNAMENT))
-    {
-        return crow::response{crow::BAD_REQUEST, "Invalid ID format"};
-    }
-
-    try {
-        auto tournament = tournamentDelegate->GetTournament(tournamentId);
-        if(tournament == nullptr)
-        {
-            return crow::response{crow::NOT_FOUND, "Tournament not found"};
-        }
-
-        nlohmann::json body = tournament;
-        auto response = crow::response{crow::OK, body.dump()};
-        response.add_header("Content-Type", "application/json");
-        return response;
-    }
-    // catch (const InvalidFormat& e) {
-    //     return crow::response{crow::BAD_REQUEST, e.what()};}
-    catch (const std::exception& e) {
-        return crow::response{crow::INTERNAL_SERVER_ERROR, "Internal server error"};
+static int mapErrorToStatus(const Error err) {
+    switch (err) {
+        case Error::NOT_FOUND: return crow::NOT_FOUND;
+        case Error::INVALID_FORMAT: return crow::BAD_REQUEST;
+        case Error::DUPLICATE: return crow::CONFLICT;
+        default: return crow::INTERNAL_SERVER_ERROR;
     }
 }
 
+crow::response TournamentController::getTournament(const std::string& tournamentId) {
+    if (!std::regex_match(tournamentId, ID_VALUE_TOURNAMENT)) {
+        return crow::response{crow::BAD_REQUEST, "Invalid ID format"};
+    }
 
-crow::response TournamentController::CreateTournament(const crow::request &request) const {
+    auto res = tournamentDelegate->GetTournament(tournamentId);
+    if (res) {
+        nlohmann::json body = *res;
+        auto response = crow::response{crow::OK, body.dump()};
+        response.add_header(CONTENT_TYPE_HEADER, JSON_CONTENT_TYPE);
+        return response;
+    } else {
+        return crow::response{mapErrorToStatus(res.error()), "Error"};
+    }
+}
+
+crow::response TournamentController::ReadAll() {
+    auto res = tournamentDelegate->ReadAll();
+    if (res) {
+        nlohmann::json arr = nlohmann::json::array();
+        for (const auto& tournamentptr : *res) {
+            if (tournamentptr) {
+                arr.push_back(*tournamentptr);
+            } else {
+                arr.push_back(nullptr);
+            }
+        }
+        auto response = crow::response{crow::OK, arr.dump()};
+        response.add_header(CONTENT_TYPE_HEADER, JSON_CONTENT_TYPE);
+        return response;
+    } else {
+        return crow::response{mapErrorToStatus(res.error()), "Error"};
+    }
+}
+
+crow::response TournamentController::CreateTournament(const crow::request& request) {
     crow::response response;
+
     if (!nlohmann::json::accept(request.body)) {
         response.code = crow::BAD_REQUEST;
         return response;
     }
     auto requestBody = nlohmann::json::parse(request.body);
-    domain::Tournament tournament;
+    domain::Tournament tournament = requestBody;
 
-    if (requestBody.contains("name")) {
-        tournament.Name() = requestBody["name"].get<std::string>();
-    }
-
-    try {
-        auto createdId = tournamentDelegate->CreateTournament(tournament);
+    auto res = tournamentDelegate->CreateTournament(tournament);
+    if (res) {
         response.code = crow::CREATED;
-        response.body = createdId;
-        nlohmann::json body = tournament;
-        response.code = crow::CREATED;
-        response.body = body.dump();
-        response.add_header("Content-Type", "application/json");
-    }catch (const std::invalid_argument& e) {
-        response.code = crow::BAD_REQUEST;
-        response.body = e.what();
-
-    }catch (const DuplicateException& e) {
-        response.code = crow::CONFLICT;
-        response.body = e.what();
-    }catch (const std::exception& e) {
-        response.code = crow::INTERNAL_SERVER_ERROR;
-        response.body = "Internal server error";
+        response.add_header("Location", *res);
+        response.body = "";
+    } else {
+        response.code = mapErrorToStatus(res.error());
+        response.body = "Error";
     }
 
     return response;
-
 }
 
-crow::response TournamentController::ReadAll() const {
-    nlohmann::json body = tournamentDelegate->ReadAll();
+crow::response TournamentController::updateTournament(const crow::request& request, const std::string& tournamentId) {
     crow::response response;
-    response.code = crow::OK;
-    response.body = body.dump();
-    response.add_header(CONTENT_TYPE_HEADER, JSON_CONTENT_TYPE);
+    if (!nlohmann::json::accept(request.body)) {
+        response.code = crow::BAD_REQUEST;
+        response.body = "Invalid JSON format";
+        return response;
+    }
+
+    auto requestBody = nlohmann::json::parse(request.body);
+    domain::Tournament tournamentObj = requestBody;
+
+    if (!tournamentObj.Id().empty()) {
+        response.code = crow::BAD_REQUEST;
+        response.body = "ID is not editable";
+        return response;
+    }
+    tournamentObj.Id() = tournamentId;
+
+    auto res = tournamentDelegate->UpdateTournament(tournamentObj);
+    if (res) {
+        response.code = crow::NO_CONTENT;
+        response.body = "";
+    } else {
+        response.code = mapErrorToStatus(res.error());
+        response.body = "Error";
+    }
 
     return response;
 }
 
-crow::response TournamentController::updateTournament(const crow::request& request, const std::string& tournamentId) const {
+crow::response TournamentController::deleteTournament(const std::string& tournamentId) {
     crow::response response;
 
     if (!std::regex_match(tournamentId, ID_VALUE_TOURNAMENT)) {
@@ -105,41 +127,13 @@ crow::response TournamentController::updateTournament(const crow::request& reque
         return response;
     }
 
-    if (!nlohmann::json::accept(request.body)) {
-        response.code = crow::BAD_REQUEST;
-        response.body = "Invalid JSON format";
-        return response;
-    }
-
-    auto requestBody = nlohmann::json::parse(request.body);
-    domain::Tournament tournamentObj;
-    try {
-        tournamentObj = requestBody;
-    } catch (const nlohmann::json::exception& e) {
-        response.code = crow::BAD_REQUEST;
-        response.body = "Request body does not match Tournament structure";
-        return response;
-    }
-
-    if (!tournamentObj.Id().empty() && tournamentObj.Id() != tournamentId) {
-        response.code = crow::BAD_REQUEST;
-        response.body = "ID is not editable";
-        return response;
-    }
-
-    tournamentObj.Id() = tournamentId;
-
-    try {
-        tournamentDelegate->UpdateTournament(tournamentObj);
-        response.code = crow::NO_CONTENT;  // 204
-    }
-    catch (const NotFoundException& e) {
-        response.code = crow::NOT_FOUND;
-        response.body = e.what();
-    }
-    catch (const std::exception& e) {
-        response.code = crow::INTERNAL_SERVER_ERROR;
-        response.body = "Internal server error";
+    auto res = tournamentDelegate->DeleteTournament(tournamentId);
+    if (res) {
+        response.code = crow::NO_CONTENT;
+        response.body = "";
+    } else {
+        response.code = mapErrorToStatus(res.error());
+        response.body = "Error";
     }
 
     return response;
@@ -147,6 +141,6 @@ crow::response TournamentController::updateTournament(const crow::request& reque
 
 REGISTER_ROUTE(TournamentController, getTournament, "/tournaments/<string>", "GET"_method)
 REGISTER_ROUTE(TournamentController, updateTournament, "/tournaments/<string>", "PATCH"_method)
-//delete y modificar update
+REGISTER_ROUTE(TournamentController, deleteTournament, "/tournaments/<string>", "DELETE"_method)
 REGISTER_ROUTE(TournamentController, CreateTournament, "/tournaments", "POST"_method)
 REGISTER_ROUTE(TournamentController, ReadAll, "/tournaments", "GET"_method)

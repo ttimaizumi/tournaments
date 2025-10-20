@@ -11,20 +11,19 @@
 
 #include "delegate/ITournamentDelegate.hpp"
 
-
 static const std::regex ID_VALUE_TOURNAMENT("[A-Za-z0-9\\-]+");
 
 class TournamentController {
     std::shared_ptr<ITournamentDelegate> tournamentDelegate;
 public:
-    explicit TournamentController(std::shared_ptr<ITournamentDelegate> tournament);
+    TournamentController(const std::shared_ptr<ITournamentDelegate>& delegate);
+    ~TournamentController();
 
-    [[nodiscard]] crow::response getTournament(const std::string& tournamentId) const;
-    [[nodiscard]] crow::response updateTournament(const crow::request& request, const std::string& tournamentId) const;
-    [[nodiscard]] crow::response CreateTournament(const crow::request &request) const;
-    [[nodiscard]] crow::response ReadAll() const;
-    [[nodiscard]] crow::response deleteTournament(const std::string& tournamentId) const;
+    crow::response getTournament(const std::string& tournamentId);
+    crow::response updateTournament(const crow::request& request, const std::string& tournamentId);
+    crow::response CreateTournament(const crow::request& request);
+    crow::response ReadAll();
+    crow::response deleteTournament(const std::string& tournamentId);
 };
-
 
 #endif //TOURNAMENTS_TOURNAMENTCONTROLLER_HPP

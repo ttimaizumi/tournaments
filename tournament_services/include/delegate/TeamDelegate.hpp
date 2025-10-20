@@ -9,7 +9,7 @@
 #include "domain/Team.hpp"
 #include "persistence/repository/IRepository.hpp"
 #include "exception/Error.hpp"
-#include "delegate/ITeamDelegate.hpp" // added
+#include "delegate/ITeamDelegate.hpp"
 
 class TeamDelegate : public ITeamDelegate { // changed: now implements ITeamDelegate
 public:
