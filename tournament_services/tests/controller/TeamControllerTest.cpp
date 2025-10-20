@@ -73,7 +73,7 @@ TEST_F(TeamControllerTest, SaveTeamTest) {
             )
         );
 
-    nlohmann::json teamRequestBody = {{"id", "new-id"}, {"name", "new team"}};
+    nlohmann::json teamRequestBody = {{"name", "new team"}};
     crow::request teamRequest;
     teamRequest.body = teamRequestBody.dump();
 
@@ -82,7 +82,27 @@ TEST_F(TeamControllerTest, SaveTeamTest) {
     testing::Mock::VerifyAndClearExpectations(&teamDelegateMock);
 
     EXPECT_EQ(crow::CREATED, response.code);
-    EXPECT_EQ(teamRequestBody.at("id").get<std::string>(), capturedTeam.Id);
+    EXPECT_EQ(teamRequestBody.at("name").get<std::string>(), capturedTeam.Name);
+}
+
+TEST_F(TeamControllerTest, SaveTeamTest_Conflict) {
+    domain::Team capturedTeam;
+    EXPECT_CALL(*teamDelegateMock, SaveTeam(::testing::_))
+        .WillOnce(testing::DoAll(
+                testing::SaveArg<0>(&capturedTeam),
+                testing::Return("")
+            )
+        );
+
+    nlohmann::json teamRequestBody = {{"name", "existing team"}};
+    crow::request teamRequest;
+    teamRequest.body = teamRequestBody.dump();
+
+    crow::response response = teamController->SaveTeam(teamRequest);
+
+    testing::Mock::VerifyAndClearExpectations(&teamDelegateMock);
+
+    EXPECT_EQ(crow::CONFLICT, response.code);
     EXPECT_EQ(teamRequestBody.at("name").get<std::string>(), capturedTeam.Name);
 }
 
@@ -99,12 +119,34 @@ TEST_F(TeamControllerTest, UpdateTeamTest) {
     crow::request teamRequest;
     teamRequest.body = teamRequestBody.dump();
 
-    crow::response response = teamController->UpdateTeam("updated-id", teamRequest);
+    crow::response response = teamController->UpdateTeam(teamRequest, "updated-id");
 
     testing::Mock::VerifyAndClearExpectations(&teamDelegateMock);
 
-    EXPECT_EQ(crow::OK, response.code);
+    EXPECT_EQ(crow::NO_CONTENT, response.code);
     EXPECT_EQ("updated-id", capturedTeam.Id);
+    EXPECT_EQ(teamRequestBody.at("name").get<std::string>(), capturedTeam.Name);
+}
+
+TEST_F(TeamControllerTest, UpdateTeamTest_NotFound) {
+    domain::Team capturedTeam;
+    EXPECT_CALL(*teamDelegateMock, UpdateTeam(::testing::_))
+        .WillOnce(testing::DoAll(
+                testing::SaveArg<0>(&capturedTeam),
+                testing::Return("")
+            )
+        );
+
+    nlohmann::json teamRequestBody = {{"name", "updated team"}};
+    crow::request teamRequest;
+    teamRequest.body = teamRequestBody.dump();
+
+    crow::response response = teamController->UpdateTeam(teamRequest, "non-existent-id");
+
+    testing::Mock::VerifyAndClearExpectations(&teamDelegateMock);
+
+    EXPECT_EQ(crow::NOT_FOUND, response.code);
+    EXPECT_EQ("non-existent-id", capturedTeam.Id);
     EXPECT_EQ(teamRequestBody.at("name").get<std::string>(), capturedTeam.Name);
 }
 // busca todos equipos con lista de objetos HTTP 200
@@ -139,10 +181,10 @@ TEST_F(TeamControllerTest, GetAllTeams_EmptyList_Returns200) {
 }
 
 TEST_F(TeamControllerTest, UpdateTeam_ErrorFormat) {
-    crow::response badRequest = teamController->UpdateTeam("", crow::request{});
+    crow::response badRequest = teamController->UpdateTeam(crow::request{}, "");
 
     EXPECT_EQ(badRequest.code, crow::BAD_REQUEST);
 
-    badRequest = teamController->UpdateTeam("mfasd#*", crow::request{});
+    badRequest = teamController->UpdateTeam(crow::request{}, "mfasd#*");
     EXPECT_EQ(badRequest.code, crow::BAD_REQUEST);
 }
