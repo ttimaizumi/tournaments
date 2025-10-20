@@ -227,6 +227,9 @@ TEST_F(TeamDelegateTest, SaveTeam_FailedInsertion_ReturnsExpectedError) {
 TEST_F(TeamDelegateTest, UpdateTeam_TeamNotFound_ReturnsExpectedError) {
     domain::Team team{"non-existent-id", "Some Team"};
 
+    EXPECT_CALL(*repositoryMock, Update(testing::_))
+            .WillOnce(testing::Return(""));  // Empty string indicates not found
+
     auto result = teamDelegate->UpdateTeam(team);
 
     ASSERT_FALSE(result.has_value());
