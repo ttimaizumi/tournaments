@@ -39,6 +39,11 @@ public:
             )");
 
             connectionPool.back()->prepare("select_group_by_tournamentid_groupid", "select * from GROUPS where tournament_id = $1 and id = $2");
+            connectionPool.back()->prepare("select_group_by_group_id_team_id", R"(
+                select * from groups
+                where id = $1
+                and document @> jsonb_build_object('teams', jsonb_build_array(jsonb_build_object('id', $2::text)))
+            )");
             connectionPool.back()->prepare("update_group", "UPDATE GROUPS SET document = $2, last_update_date = CURRENT_TIMESTAMP WHERE id = $1 RETURNING document");
             connectionPool.back()->prepare("update_group_add_team", R"(
                 update groups

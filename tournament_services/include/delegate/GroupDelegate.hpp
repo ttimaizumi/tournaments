@@ -5,12 +5,16 @@
 #include <string_view>
 #include <memory>
 #include <expected>
+#include <regex>
 
 #include "IGroupDelegate.hpp"
 #include "domain/Group.hpp"
 #include "persistence/repository/IGroupRepository.hpp"
 #include "persistence/repository/TournamentRepository.hpp"
 #include "persistence/repository/TeamRepository.hpp"
+#include "exception/Error.hpp"
+
+static const std::regex ID_GROUPVALUE(R"([a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12})");
 
 class GroupDelegate : public IGroupDelegate{
     std::shared_ptr<TournamentRepository> tournamentRepository;
@@ -19,12 +23,12 @@ class GroupDelegate : public IGroupDelegate{
 
 public:
     GroupDelegate(const std::shared_ptr<TournamentRepository>& tournamentRepository, const std::shared_ptr<IGroupRepository>& groupRepository, const std::shared_ptr<TeamRepository>& teamRepository);
-    std::expected<std::string, std::string> CreateGroup(const std::string_view& tournamentId, const domain::Group& group) override;
-    std::expected<std::vector<std::shared_ptr<domain::Group>>, std::string> GetGroups(const std::string_view& tournamentId) override;
-    std::expected<std::shared_ptr<domain::Group>, std::string> GetGroup(const std::string_view& tournamentId, const std::string_view& groupId) override;
-    std::expected<void, std::string> UpdateGroup(const std::string_view& tournamentId, const domain::Group& group, const std::string_view& groupId) override;
-    std::expected<void, std::string> RemoveGroup(const std::string_view& tournamentId, const std::string_view& groupId) override;
-    std::expected<void, std::string> UpdateTeams(const std::string_view& tournamentId, const std::string_view& groupId, const std::vector<domain::Team>& team) override;
+    std::expected<std::shared_ptr<domain::Group>, Error> GetGroup(const std::string_view& tournamentId, const std::string_view& groupId) override;
+    std::expected<std::vector<std::shared_ptr<domain::Group>>, Error> GetGroups(const std::string_view& tournamentId) override;
+    std::expected<std::string, Error> CreateGroup(const std::string_view& tournamentId, const domain::Group& group) override;
+    std::expected<void, Error> UpdateGroup(const std::string_view& tournamentId, const domain::Group& group, const std::string_view& groupId) override;
+    std::expected<void, Error> UpdateTeams(const std::string_view& tournamentId, const std::string_view& groupId, const std::vector<domain::Team>& team) override;
+    std::expected<void, Error> RemoveGroup(const std::string_view& tournamentId, const std::string_view& groupId) override;
 };
 
 #endif /* SERVICE_GROUP_DELEGATE_HPP */

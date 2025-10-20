@@ -9,6 +9,7 @@
 #include "exception/Duplicate.hpp"
 #include "exception/NotFound.hpp"
 #include "exception/InvalidFormat.hpp"
+#include "exception/Error.hpp"
 #include <iostream>
 
 GroupController::GroupController(const std::shared_ptr<IGroupDelegate>& delegate) : groupDelegate(std::move(delegate)) {}
@@ -17,145 +18,104 @@ GroupController::~GroupController()
 {
 }
 
-crow::response GroupController::GetGroups(const std::string& tournamentId){
+static crow::response createErrorResponse(const Error err, const std::string& message = "Error") {
+  crow::response response;
+  response.body = message;
+  
+  switch (err) {
+    case Error::NOT_FOUND: 
+      response.code = crow::NOT_FOUND;
+      break;
+    case Error::INVALID_FORMAT: 
+      response.code = crow::BAD_REQUEST;
+      break;
+    case Error::DUPLICATE: 
+      response.code = crow::CONFLICT;
+      break;
+    case Error::UNPROCESSABLE_ENTITY: 
+      response.code = 422;
+      break;
+    default: 
+      response.code = crow::INTERNAL_SERVER_ERROR;
+      break;
+  }
+  
+  return response;
+}
 
-    if (!std::regex_match(tournamentId, ID_GROUPVALUE)) {
-        return crow::response{crow::BAD_REQUEST, "Invalid tournament ID format. Must be a valid UUID."};
+crow::response GroupController::GetGroups(const std::string& tournamentId){
+    auto groups = this->groupDelegate->GetGroups(tournamentId);
+    if (groups) {
+        const nlohmann::json body = *groups;
+        crow::response response{crow::OK, body.dump()};
+        response.add_header(CONTENT_TYPE_HEADER, JSON_CONTENT_TYPE);
+        return response;
     }
-    
-    try {
-        auto groups = this->groupDelegate->GetGroups(tournamentId);
-        if (groups) {
-            const nlohmann::json body = *groups;
-            crow::response response{crow::OK, body.dump()};
-            response.add_header(CONTENT_TYPE_HEADER, JSON_CONTENT_TYPE);
-            return response;
-        } else {
-            return crow::response{crow::INTERNAL_SERVER_ERROR, groups.error()};
-        }
-    } catch (const NotFoundException& e) {
-        return crow::response{crow::NOT_FOUND, e.what()};
-    } catch (const InvalidFormatException& e) {
-        return crow::response{crow::BAD_REQUEST, e.what()};
-    }
+    return crow::response{ mapErrorToStatus(groups.error()), "Error" };
 }
 
 crow::response GroupController::GetGroup(const std::string& tournamentId, const std::string& groupId){
-    if (!std::regex_match(tournamentId, ID_GROUPVALUE)) {
-        return crow::response{crow::BAD_REQUEST, "Invalid tournament ID format. Must be a valid UUID."};
+    auto result = this->groupDelegate->GetGroup(tournamentId, groupId);
+    if (result) {
+        const nlohmann::json body = *result;
+        crow::response response{crow::OK, body.dump()};
+        response.add_header(CONTENT_TYPE_HEADER, JSON_CONTENT_TYPE);
+        return response;
     }
-    if (!std::regex_match(groupId, ID_GROUPVALUE)) {
-        return crow::response{crow::BAD_REQUEST, "Invalid group ID format. Must be a valid UUID."};
-    }
-    
-    try {
-        auto group = this->groupDelegate->GetGroup(tournamentId, groupId);
-        if (group) {
-            const nlohmann::json body = *group;
-            crow::response response{crow::OK, body.dump()};
-            response.add_header(CONTENT_TYPE_HEADER, JSON_CONTENT_TYPE);
-            return response;
-        } else {
-            return crow::response{crow::INTERNAL_SERVER_ERROR, group.error()};
-        }
-    } catch (const NotFoundException& e) {
-        return crow::response{crow::NOT_FOUND, e.what()};
-    } catch (const InvalidFormatException& e) {
-        return crow::response{crow::BAD_REQUEST, e.what()};
-    }
+    return crow::response{ mapErrorToStatus(result.error()), "Error" };
 }
 
 crow::response GroupController::CreateGroup(const crow::request& request, const std::string& tournamentId){
-    if (!std::regex_match(tournamentId, ID_GROUPVALUE)) {
-        return crow::response{crow::BAD_REQUEST, "Invalid tournament ID format. Must be a valid UUID."};
-    }
-    try {
-        auto requestBody = nlohmann::json::parse(request.body);
-        domain::Group group = requestBody;
+    auto requestBody = nlohmann::json::parse(request.body);
+    domain::Group group = requestBody;
 
-        auto groupId = groupDelegate->CreateGroup(tournamentId, group);
+    auto groupId = groupDelegate->CreateGroup(tournamentId, group);
+    if (groupId) {
         crow::response response;
-        if (groupId) {
-            response.add_header("location", *groupId);
-            response.code = crow::CREATED;
-        } else {
-            return crow::response{crow::INTERNAL_SERVER_ERROR, groupId.error()};
-            // response.code = 422;
-            // response.body = groupId.error();
-        }
+        response.add_header("location", *groupId);
+        response.code = crow::CREATED;
         return response;
-    } catch (const NotFoundException& e) {
-        return crow::response{crow::NOT_FOUND, e.what()};
-    } catch (const InvalidFormatException& e) {
-        return crow::response{crow::BAD_REQUEST, e.what()};
-    } catch (const DuplicateException& e) {
-        return crow::response{crow::CONFLICT, e.what()};
-    } catch (const nlohmann::json::parse_error& e) {
-        return crow::response{crow::BAD_REQUEST, "Invalid JSON in request body"};
     }
+    return crow::response{ mapErrorToStatus(groupId.error()), "Error" };
 }
 
 crow::response GroupController::UpdateGroup(const crow::request& request, const std::string& tournamentId, const std::string& groupId) {
-    if (!std::regex_match(tournamentId, ID_GROUPVALUE)) {
-        return crow::response{crow::BAD_REQUEST, "Invalid tournament ID format. Must be a valid UUID."};
+    auto requestBody = nlohmann::json::parse(request.body);
+    domain::Group group = requestBody;
+
+    auto result = groupDelegate->UpdateGroup(tournamentId, group, groupId);
+    if (result) {
+        crow::response response{crow::NO_CONTENT};
+        return response;
     }
-    if (!std::regex_match(groupId, ID_GROUPVALUE)) {
-        return crow::response{crow::BAD_REQUEST, "Invalid group ID format. Must be a valid UUID."};
-    }
-    try {
-        domain::Group group = nlohmann::json::parse(request.body);
-        
-        auto result = groupDelegate->UpdateGroup(tournamentId, group, groupId);
-        
-        if (result.has_value()) {
-            return crow::response{crow::NO_CONTENT}; // 204 No Content for successful update
-        } else {
-            return crow::response{crow::INTERNAL_SERVER_ERROR, result.error()};
-        }
-    } catch (const NotFoundException& e) {
-        return crow::response{crow::NOT_FOUND, e.what()};
-    } catch (const InvalidFormatException& e) {
-        return crow::response{crow::BAD_REQUEST, e.what()};
-    } catch (const DuplicateException& e) {
-        return crow::response{crow::CONFLICT, e.what()};
-    } catch (const nlohmann::json::parse_error& e) {
-        return crow::response{crow::BAD_REQUEST, "Invalid JSON in request body"};
-    }
+    return crow::response{ mapErrorToStatus(result.error()), "Error" };
 }
 
-crow::response GroupController::UpdateTeams(const crow::request& request, const std::string& tournamentId, const std::string& groupId) {
-    const std::vector<domain::Team> teams = nlohmann::json::parse(request.body);
+crow::response GroupController::AddTeams(const crow::request& request, const std::string& tournamentId, const std::string& groupId) {
+    auto requestBody = nlohmann::json::parse(request.body);
+    std::vector<domain::Team> teams = requestBody.get<std::vector<domain::Team>>();
+
     const auto result = groupDelegate->UpdateTeams(tournamentId, groupId, teams);
     if (result) {
-        return crow::response{crow::NO_CONTENT};
+        crow::response response{crow::NO_CONTENT};
+        return response;
     }
-
-    return crow::response{422, result.error()};
+    return crow::response{ mapErrorToStatus(result.error()), "Error" };
 }
 
 crow::response GroupController::RemoveGroup(const std::string& tournamentId, const std::string& groupId) {
-    if (!std::regex_match(tournamentId, ID_GROUPVALUE)) {
-        return crow::response{crow::BAD_REQUEST, "Invalid tournament ID format. Must be a valid UUID."};
+    auto result = this->groupDelegate->RemoveGroup(tournamentId, groupId);
+    if (result) {
+        crow::response response{crow::NO_CONTENT};
+        response.add_header(CONTENT_TYPE_HEADER, JSON_CONTENT_TYPE);
+        return response;
     }
-    if (!std::regex_match(groupId, ID_GROUPVALUE)) {
-        return crow::response{crow::BAD_REQUEST, "Invalid group ID format. Must be a valid UUID."};
-    }
-
-    try {
-        groupDelegate->RemoveGroup(tournamentId, groupId);
-        return crow::response{crow::NO_CONTENT};
-    } catch (const NotFoundException& e) {
-        return crow::response{crow::NOT_FOUND, e.what()};
-    } catch (const InvalidFormatException& e) {
-        return crow::response{crow::BAD_REQUEST, e.what()};
-    } catch (const std::exception& e) {
-        return crow::response{crow::INTERNAL_SERVER_ERROR, e.what()};
-    }
+    return crow::response{ mapErrorToStatus(result.error()), "Error" };
 }
 
 REGISTER_ROUTE(GroupController, GetGroups, "/tournaments/<string>/groups", "GET"_method) 
 REGISTER_ROUTE(GroupController, GetGroup, "/tournaments/<string>/groups/<string>", "GET"_method)
 REGISTER_ROUTE(GroupController, CreateGroup, "/tournaments/<string>/groups", "POST"_method)
 REGISTER_ROUTE(GroupController, UpdateGroup, "/tournaments/<string>/groups/<string>", "PATCH"_method)
-REGISTER_ROUTE(GroupController, UpdateTeams, "/tournaments/<string>/groups/<string>/teams", "PATCH"_method)
+REGISTER_ROUTE(GroupController, AddTeams, "/tournaments/<string>/groups/<string>/teams", "PATCH"_method)
 REGISTER_ROUTE(GroupController, RemoveGroup, "/tournaments/<string>/groups/<string>", "DELETE"_method)

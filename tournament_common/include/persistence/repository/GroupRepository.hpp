@@ -26,6 +26,7 @@ public:
     std::vector<std::shared_ptr<domain::Group>> FindByTournamentId(const std::string_view& tournamentId) override;
     std::shared_ptr<domain::Group> FindByTournamentIdAndGroupId(const std::string_view& tournamentId, const std::string_view& groupId) override;
     std::shared_ptr<domain::Group> FindByTournamentIdAndTeamId(const std::string_view& tournamentId, const std::string_view& teamId) override;
+    std::shared_ptr<domain::Group> FindByGroupIdAndTeamId(const std::string_view& groupId, const std::string_view& teamId) override;
     void UpdateGroupAddTeam(const std::string_view& groupId, const std::shared_ptr<domain::Team> & team) override;
 };
 
