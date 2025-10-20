@@ -6,15 +6,28 @@
 #include "persistence/repository/GroupRepository.hpp"
 #include "persistence/repository/TournamentRepository.hpp"
 #include <utility>
+#include <format>
 
-GroupDelegate::GroupDelegate(const std::shared_ptr<TournamentRepository>& tournamentRepository, const std::shared_ptr<IGroupRepository>& groupRepository, const std::shared_ptr<TeamRepository>& teamRepository)
-    : tournamentRepository(tournamentRepository), groupRepository(groupRepository), teamRepository(teamRepository){}
+GroupDelegate::GroupDelegate(
+    const std::shared_ptr<IRepository<domain::Tournament, std::string>>& tournamentRepository,
+    const std::shared_ptr<IGroupRepository>& groupRepository,
+    const std::shared_ptr<IRepository<domain::Team, std::string_view>>& teamRepository,
+    const std::shared_ptr<QueueMessageProducer>& producer
+)
+    : tournamentRepository(tournamentRepository), groupRepository(groupRepository), teamRepository(teamRepository), producer(producer){}
 
 std::expected<std::string, std::string> GroupDelegate::CreateGroup(const std::string_view& tournamentId, const domain::Group& group) {
     auto tournament = tournamentRepository->ReadById(tournamentId.data());
     if (tournament == nullptr) {
         return std::unexpected("Tournament doesn't exist");
     }
+
+    // Validate max teams per group for the tournament format
+    int maxTeamsPerGroup = tournament->Format().MaxTeamsPerGroup();
+    if (!group.Teams().empty() && group.Teams().size() > maxTeamsPerGroup) {
+        return std::unexpected(std::format("Group exceeds maximum teams allowed ({})", maxTeamsPerGroup));
+    }
+
     domain::Group g = group;
     g.TournamentId() = tournament->Id();
     if (!g.Teams().empty()) {
@@ -26,6 +39,14 @@ std::expected<std::string, std::string> GroupDelegate::CreateGroup(const std::st
         }
     }
     auto id = groupRepository->Create(g);
+
+    // Generate events for each team added to the group
+    if (!g.Teams().empty()) {
+        for (const auto& team : g.Teams()) {
+            producer->SendMessage(std::format("{}:{}:{}", tournamentId, id, team.Id), "team.added.to.group");
+        }
+    }
+
     return id;
 }
 
@@ -107,6 +128,9 @@ std::expected<void, std::string> GroupDelegate::UpdateTeams(const std::string_vi
             return std::unexpected(std::format("Team {} doesn't exist", team.Id));
         }
         groupRepository->UpdateGroupAddTeam(groupId, persistedTeam);
+
+        // Generate event for each team added to the group
+        producer->SendMessage(std::format("{}:{}:{}", tournamentId, groupId, team.Id), "team.added.to.group");
     }
     return {};
 }

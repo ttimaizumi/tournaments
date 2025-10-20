@@ -7,17 +7,24 @@
 #include <expected>
 
 #include "IGroupDelegate.hpp"
+#include "cms/QueueMessageProducer.hpp"
 #include "persistence/repository/IGroupRepository.hpp"
 #include "persistence/repository/TeamRepository.hpp"
 #include "persistence/repository/TournamentRepository.hpp"
 
 class GroupDelegate : public IGroupDelegate{
-    std::shared_ptr<TournamentRepository> tournamentRepository;
+    std::shared_ptr<IRepository<domain::Tournament, std::string>> tournamentRepository;
     std::shared_ptr<IGroupRepository> groupRepository;
-    std::shared_ptr<TeamRepository> teamRepository;
+    std::shared_ptr<IRepository<domain::Team, std::string_view>> teamRepository;
+    std::shared_ptr<QueueMessageProducer> producer;
 
 public:
-    GroupDelegate(const std::shared_ptr<TournamentRepository>& tournamentRepository, const std::shared_ptr<IGroupRepository>& groupRepository, const std::shared_ptr<TeamRepository>& teamRepository);
+    GroupDelegate(
+        const std::shared_ptr<IRepository<domain::Tournament, std::string>>& tournamentRepository,
+        const std::shared_ptr<IGroupRepository>& groupRepository,
+        const std::shared_ptr<IRepository<domain::Team, std::string_view>>& teamRepository,
+        const std::shared_ptr<QueueMessageProducer>& producer
+    );
     std::expected<std::string, std::string> CreateGroup(const std::string_view& tournamentId, const domain::Group& group) override;
     std::expected<std::vector<std::shared_ptr<domain::Group>>, std::string> GetGroups(const std::string_view& tournamentId) override;
     std::expected<std::shared_ptr<domain::Group>, std::string> GetGroup(const std::string_view& tournamentId, const std::string_view& groupId) override;
