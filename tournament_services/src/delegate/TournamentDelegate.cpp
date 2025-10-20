@@ -12,13 +12,11 @@ TournamentDelegate::TournamentDelegate(std::shared_ptr<IRepository<domain::Tourn
 }
 
 std::string TournamentDelegate::CreateTournament(std::shared_ptr<domain::Tournament> tournament) {
-    // Verificar si el torneo ya existe
     auto tournamentRepo = dynamic_cast<TournamentRepository*>(tournamentRepository.get());
     if(tournamentRepo && tournamentRepo->ExistsByName(tournament->Name())) {
-        return ""; // Retornar vacío para indicar conflicto
+        return "";
     }
 
-    // Comentado: llenar grupos según max groups
     // std::shared_ptr<domain::Tournament> tp = std::move(tournament);
     // for (auto[i, g] = std::tuple{0, 'A'}; i < tp->Format().NumberOfGroups(); i++,g++) {
     //     tp->Groups().push_back(domain::Group{std::format("Tournament {}", g)});
@@ -26,7 +24,6 @@ std::string TournamentDelegate::CreateTournament(std::shared_ptr<domain::Tournam
 
     std::string id = tournamentRepository->Create(*tournament);
 
-    // Solo enviar mensaje si se creó exitosamente
     producer->SendMessage(id, "tournament.created");
 
     // if groups are completed also create matches

@@ -30,7 +30,7 @@ crow::response TournamentController::CreateTournament(const crow::request &reque
     const std::string id = tournamentDelegate->CreateTournament(tournament);
 
     if(id.empty()) {
-        response.code = crow::CONFLICT; // 409
+        response.code = crow::CONFLICT;
         return response;
     }
 
