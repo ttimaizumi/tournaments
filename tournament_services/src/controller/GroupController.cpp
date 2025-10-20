@@ -25,6 +25,24 @@ crow::response GroupController::GetGroups(const std::string& tournamentId) {
     return crow::response{422};
 }
 
+crow::response GroupController::GetGroup(const std::string& tournamentId, const std::string& groupId) {
+    auto groupResult = groupDelegate->GetGroup(tournamentId, groupId);
+
+    if (!groupResult.has_value()) {
+        return crow::response{crow::INTERNAL_SERVER_ERROR, groupResult.error()};
+    }
+
+    auto group = groupResult.value();
+    if (group == nullptr) {
+        return crow::response{crow::NOT_FOUND, "Group not found"};
+    }
+
+    nlohmann::json body = group;
+    crow::response response{crow::OK, body.dump()};
+    response.add_header(CONTENT_TYPE_HEADER, JSON_CONTENT_TYPE);
+    return response;
+}
+
 crow::response GroupController::CreateGroup(const crow::request& request, const std::string& tournamentId) {
     try {
         auto requestBody = nlohmann::json::parse(request.body);
@@ -38,6 +56,40 @@ crow::response GroupController::CreateGroup(const crow::request& request, const 
     } catch (const nlohmann::json::exception&) {
         return crow::response{422};
     }
+}
+
+crow::response GroupController::UpdateGroup(const crow::request& request, const std::string& tournamentId, const std::string& groupId) {
+    try {
+        auto requestBody = nlohmann::json::parse(request.body);
+        domain::Group group = requestBody;
+        group.Id() = groupId;
+
+        auto result = groupDelegate->UpdateGroup(tournamentId, group);
+
+        if (!result.has_value()) {
+            if (result.error().find("doesn't exist") != std::string::npos) {
+                return crow::response{crow::NOT_FOUND, result.error()};
+            }
+            return crow::response{422, result.error()};
+        }
+
+        return crow::response{crow::NO_CONTENT};
+    } catch (const nlohmann::json::exception&) {
+        return crow::response{422};
+    }
+}
+
+crow::response GroupController::RemoveGroup(const std::string& tournamentId, const std::string& groupId) {
+    auto result = groupDelegate->RemoveGroup(tournamentId, groupId);
+
+    if (!result.has_value()) {
+        if (result.error().find("doesn't exist") != std::string::npos) {
+            return crow::response{crow::NOT_FOUND, result.error()};
+        }
+        return crow::response{422, result.error()};
+    }
+
+    return crow::response{crow::NO_CONTENT};
 }
 
 crow::response GroupController::UpdateTeams(
@@ -69,5 +121,8 @@ crow::response GroupController::UpdateTeams(
 }
 
 REGISTER_ROUTE(GroupController, GetGroups, "/tournaments/<string>/groups", "GET"_method)
+REGISTER_ROUTE(GroupController, GetGroup, "/tournaments/<string>/groups/<string>", "GET"_method)
 REGISTER_ROUTE(GroupController, CreateGroup, "/tournaments/<string>/groups", "POST"_method)
+REGISTER_ROUTE(GroupController, UpdateGroup, "/tournaments/<string>/groups/<string>", "PATCH"_method)
+REGISTER_ROUTE(GroupController, RemoveGroup, "/tournaments/<string>/groups/<string>", "DELETE"_method)
 REGISTER_ROUTE(GroupController, UpdateTeams, "/tournaments/<string>/groups/<string>/teams", "POST"_method)
