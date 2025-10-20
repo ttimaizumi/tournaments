@@ -8,124 +8,196 @@
 
 #include "domain/Tournament.hpp"
 #include "persistence/repository/IRepository.hpp"
+#include "persistence/repository/TournamentRepository.hpp"
+#include "cms/QueueMessageProducer.hpp"
+#include "cms/IQueueMessageProducer.hpp"
 #include "delegate/TournamentDelegate.hpp"
 
-class TournamentRepositoryMock : public IRepository<domain::Tournament, std::string_view> {
+class TournamentRepositoryMock : public IRepository<domain::Tournament, std::string> {
 public:
-    MOCK_METHOD(std::string_view, Create, (const domain::Tournament&), (override));
-    MOCK_METHOD(std::shared_ptr<domain::Tournament>, ReadById, (std::string_view), (override));
+    MOCK_METHOD(std::string, Create, (const domain::Tournament&), (override));
+    MOCK_METHOD(std::shared_ptr<domain::Tournament>, ReadById, (std::string), (override));
     MOCK_METHOD(std::vector<std::shared_ptr<domain::Tournament>>, ReadAll, (), (override));
-    MOCK_METHOD(std::string_view, Update, (const domain::Tournament&), (override));
-    MOCK_METHOD(bool, Delete, (std::string_view), (override));
+    MOCK_METHOD(std::string, Update, (const domain::Tournament&), (override));
+    MOCK_METHOD(void, Delete, (std::string), (override));
+};
+
+class QueueMessageProducerMock : public QueueMessageProducer {
+public:
+    QueueMessageProducerMock() : QueueMessageProducer(nullptr) {}
+
+    MOCK_METHOD(void, SendMessage, (const std::string_view&, const std::string_view&), (override));
 };
 
 class TournamentDelegateTest : public ::testing::Test {
 protected:
-    std::shared_ptr<TournamentRepositoryMock> repositoryMock;
+    std::shared_ptr<TournamentRepositoryMock> repositoryMockPtr;
+    std::shared_ptr<QueueMessageProducerMock> producerMockPtr;
+    TournamentRepositoryMock* repositoryMock;
+    QueueMessageProducerMock* producerMock;
     std::shared_ptr<TournamentDelegate> tournamentDelegate;
 
     void SetUp() override {
-        repositoryMock = std::make_shared<TournamentRepositoryMock>();
-        tournamentDelegate = std::make_shared<TournamentDelegate>(repositoryMock);
+        repositoryMockPtr = std::make_shared<TournamentRepositoryMock>();
+        producerMockPtr = std::make_shared<QueueMessageProducerMock>();
+        repositoryMock = repositoryMockPtr.get();
+        producerMock = producerMockPtr.get();
+
+        tournamentDelegate = std::shared_ptr<TournamentDelegate>(
+                new TournamentDelegate(repositoryMockPtr, producerMockPtr)
+        );
+    }
+
+    void TearDown() override {
+        testing::Mock::VerifyAndClearExpectations(repositoryMock);
+        testing::Mock::VerifyAndClearExpectations(producerMock);
     }
 };
 
-// Test 1: Crear torneo - inserción válida
-TEST_F(TournamentDelegateTest, SaveTournament_ValidTournament_ReturnsId) {
-    domain::Tournament tournament("Mundial 2025");
+// Test 1: Crear torneo - validar transferencia y respuesta con ID generado
+TEST_F(TournamentDelegateTest, CreateTournament_ValidInsertion_ReturnsGeneratedId) {
+    auto tournament = std::make_shared<domain::Tournament>("Mundial 2025");
+    const std::string expectedId = "generated-uuid-123";
+    domain::Tournament capturedTournament("");
 
     EXPECT_CALL(*repositoryMock, Create(testing::_))
-        .WillOnce(testing::Return("generated-id"));
+            .WillOnce(testing::DoAll(
+                    testing::SaveArg<0>(&capturedTournament),
+                    testing::Return(expectedId)
+            ));
 
-    auto result = tournamentDelegate->SaveTournament(tournament);
+    EXPECT_CALL(*producerMock, SendMessage(testing::Eq(expectedId), testing::Eq("tournament.created")))
+            .Times(1);
 
-    EXPECT_EQ("generated-id", result);
+    auto result = tournamentDelegate->CreateTournament(tournament);
+
+    EXPECT_EQ(expectedId, result);
+    EXPECT_EQ("Mundial 2025", capturedTournament.Name());
 }
 
-// Test 2: Crear torneo - inserción fallida
-TEST_F(TournamentDelegateTest, SaveTournament_DuplicateTournament_ThrowsException) {
-    domain::Tournament tournament("Duplicate Tournament");
+// Test 2: Crear torneo - inserción fallida retorna cadena vacía (error)
+TEST_F(TournamentDelegateTest, CreateTournament_FailedInsertion_ReturnsEmptyString) {
+    auto tournament = std::make_shared<domain::Tournament>("Duplicate Tournament");
 
     EXPECT_CALL(*repositoryMock, Create(testing::_))
-        .WillOnce(testing::Throw(std::runtime_error("Tournament already exists")));
+            .WillOnce(testing::Throw(std::runtime_error("Duplicate entry")));
 
-    EXPECT_THROW(tournamentDelegate->SaveTournament(tournament), std::runtime_error);
+    EXPECT_CALL(*producerMock, SendMessage(testing::_, testing::_))
+            .Times(0);
+
+    EXPECT_THROW({
+                     tournamentDelegate->CreateTournament(tournament);
+                 }, std::runtime_error);
 }
 
-// Test 3: Buscar torneo por ID - resultado con objeto
-TEST_F(TournamentDelegateTest, GetTournament_ValidId_ReturnsTournament) {
+// Test 3: Buscar por ID - validar transferencia de ID y retorno con objeto
+TEST_F(TournamentDelegateTest, ReadById_ValidId_ReturnsObjectWithCorrectValues) {
+    const std::string tournamentId = "tournament-uuid-456";
+    std::string capturedId;
     auto expectedTournament = std::make_shared<domain::Tournament>("Mundial 2025");
-    expectedTournament->Id() = "tournament-id";
+    expectedTournament->Id() = tournamentId;
 
-    EXPECT_CALL(*repositoryMock, ReadById(testing::Eq("tournament-id")))
-        .WillOnce(testing::Return(expectedTournament));
+    EXPECT_CALL(*repositoryMock, ReadById(testing::_))
+            .WillOnce(testing::DoAll(
+                    testing::SaveArg<0>(&capturedId),
+                    testing::Return(expectedTournament)
+            ));
 
-    auto result = tournamentDelegate->GetTournament("tournament-id");
+    auto result = tournamentDelegate->ReadById(tournamentId);
 
+    EXPECT_EQ(tournamentId, capturedId);
     ASSERT_NE(nullptr, result);
-    EXPECT_EQ("tournament-id", result->Id());
+    EXPECT_EQ(tournamentId, result->Id());
     EXPECT_EQ("Mundial 2025", result->Name());
 }
 
-// Test 4: Buscar torneo por ID - resultado nulo
-TEST_F(TournamentDelegateTest, GetTournament_InvalidId_ReturnsNull) {
-    EXPECT_CALL(*repositoryMock, ReadById(testing::Eq("invalid-id")))
-        .WillOnce(testing::Return(nullptr));
+// Test 4: Buscar por ID - validar transferencia de ID y resultado nulo
+TEST_F(TournamentDelegateTest, ReadById_InvalidId_ReturnsNullptr) {
+    const std::string invalidId = "non-existent-id";
+    std::string capturedId;
 
-    auto result = tournamentDelegate->GetTournament("invalid-id");
+    EXPECT_CALL(*repositoryMock, ReadById(testing::_))
+            .WillOnce(testing::DoAll(
+                    testing::SaveArg<0>(&capturedId),
+                    testing::Return(nullptr)
+            ));
 
+    auto result = tournamentDelegate->ReadById(invalidId);
+
+    EXPECT_EQ(invalidId, capturedId);
     EXPECT_EQ(nullptr, result);
 }
 
-// Test 5: Buscar torneos - lista con objetos
-TEST_F(TournamentDelegateTest, GetAllTournaments_WithTournaments_ReturnsList) {
+// Test 5: Buscar todos - resultado con lista de objetos
+TEST_F(TournamentDelegateTest, ReadAll_WithTournaments_ReturnsListOfObjects) {
+    auto tournament1 = std::make_shared<domain::Tournament>("Mundial 2025");
+    tournament1->Id() = "id-1";
+    auto tournament2 = std::make_shared<domain::Tournament>("Copa America");
+    tournament2->Id() = "id-2";
+    auto tournament3 = std::make_shared<domain::Tournament>("Eurocopa");
+    tournament3->Id() = "id-3";
+
     std::vector<std::shared_ptr<domain::Tournament>> tournaments = {
-        std::make_shared<domain::Tournament>("Mundial 2025"),
-        std::make_shared<domain::Tournament>("Copa America")
+            tournament1, tournament2, tournament3
     };
 
     EXPECT_CALL(*repositoryMock, ReadAll())
-        .WillOnce(testing::Return(tournaments));
+            .WillOnce(testing::Return(tournaments));
 
-    auto result = tournamentDelegate->GetAllTournaments();
+    auto result = tournamentDelegate->ReadAll();
 
-    EXPECT_EQ(2, result.size());
+    ASSERT_EQ(3, result.size());
+    EXPECT_EQ("id-1", result[0]->Id());
     EXPECT_EQ("Mundial 2025", result[0]->Name());
+    EXPECT_EQ("id-2", result[1]->Id());
     EXPECT_EQ("Copa America", result[1]->Name());
+    EXPECT_EQ("id-3", result[2]->Id());
+    EXPECT_EQ("Eurocopa", result[2]->Name());
 }
 
-// Test 6: Buscar torneos - lista vacía
-TEST_F(TournamentDelegateTest, GetAllTournaments_NoTournaments_ReturnsEmptyList) {
+// Test 6: Buscar todos - resultado con lista vacía
+TEST_F(TournamentDelegateTest, ReadAll_EmptyRepository_ReturnsEmptyList) {
     std::vector<std::shared_ptr<domain::Tournament>> emptyList;
 
     EXPECT_CALL(*repositoryMock, ReadAll())
-        .WillOnce(testing::Return(emptyList));
+            .WillOnce(testing::Return(emptyList));
 
-    auto result = tournamentDelegate->GetAllTournaments();
+    auto result = tournamentDelegate->ReadAll();
 
+    EXPECT_TRUE(result.empty());
     EXPECT_EQ(0, result.size());
 }
 
-// Test 7: Actualizar torneo - actualización válida
-TEST_F(TournamentDelegateTest, UpdateTournament_ValidTournament_ReturnsId) {
-    domain::Tournament tournament("Updated Tournament");
-    tournament.Id() = "tournament-id";
+// Test 7: Actualizar torneo - validar transferencia a Update y resultado exitoso
+TEST_F(TournamentDelegateTest, UpdateTournament_ValidUpdate_ReturnsUpdatedId) {
+    const std::string tournamentId = "tournament-uuid-789";
+    domain::Tournament tournament("Updated Tournament Name");
+    tournament.Id() = tournamentId;
+    domain::Tournament capturedTournament("");
 
     EXPECT_CALL(*repositoryMock, Update(testing::_))
-        .WillOnce(testing::Return("tournament-id"));
+            .WillOnce(testing::DoAll(
+                    testing::SaveArg<0>(&capturedTournament),
+                    testing::Return(tournamentId)
+            ));
 
     auto result = tournamentDelegate->UpdateTournament(tournament);
 
-    EXPECT_EQ("tournament-id", result);
+    EXPECT_EQ(tournamentId, result);
+    EXPECT_EQ(tournamentId, capturedTournament.Id());
+    EXPECT_EQ("Updated Tournament Name", capturedTournament.Name());
 }
 
-// Test 8: Actualizar torneo - ID no encontrado
-TEST_F(TournamentDelegateTest, UpdateTournament_InvalidId_ThrowsException) {
-    domain::Tournament tournament("Tournament");
-    tournament.Id() = "invalid-id";
+// Test 8: Actualizar torneo - búsqueda no exitosa retorna cadena vacía (error)
+TEST_F(TournamentDelegateTest, UpdateTournament_NonExistentId_ReturnsEmptyString) {
+    const std::string nonExistentId = "non-existent-uuid";
+    domain::Tournament tournament("Some Tournament");
+    tournament.Id() = nonExistentId;
 
     EXPECT_CALL(*repositoryMock, Update(testing::_))
-        .WillOnce(testing::Throw(std::runtime_error("Tournament not found")));
+            .WillOnce(testing::Throw(std::runtime_error("Tournament not found")));
 
-    EXPECT_THROW(tournamentDelegate->UpdateTournament(tournament), std::runtime_error);
+    EXPECT_THROW({
+                     tournamentDelegate->UpdateTournament(tournament);
+                 }, std::runtime_error);
 }
