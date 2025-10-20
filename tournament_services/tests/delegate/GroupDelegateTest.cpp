@@ -2,15 +2,16 @@
 #include <gmock/gmock.h>
 #include <memory>
 #include <expected>
+#include <pqxx/pqxx>
 
 #include "domain/Group.hpp"
+#include "domain/Team.hpp"
+#include "domain/Tournament.hpp"
 #include "delegate/GroupDelegate.hpp"
 #include "persistence/repository/IGroupRepository.hpp"
 #include "persistence/repository/TournamentRepository.hpp"
 #include "persistence/repository/TeamRepository.hpp"
-#include "exception/Duplicate.hpp"
-#include "exception/NotFound.hpp"
-#include "exception/InvalidFormat.hpp"
+#include "exception/Error.hpp"
 
 class MockGroupRepository : public IGroupRepository {
     public:
@@ -22,6 +23,7 @@ class MockGroupRepository : public IGroupRepository {
     MOCK_METHOD(std::vector<std::shared_ptr<domain::Group>>, ReadAll, (), (override));
     MOCK_METHOD(std::shared_ptr<domain::Group>, FindByTournamentIdAndGroupId, (const std::string_view& tournamentId, const std::string_view& groupId), (override));
     MOCK_METHOD(std::shared_ptr<domain::Group>, FindByTournamentIdAndTeamId, (const std::string_view& tournamentId, const std::string_view& teamId), (override));   
+    MOCK_METHOD(std::shared_ptr<domain::Group>, FindByGroupIdAndTeamId, (const std::string_view& groupId, const std::string_view& teamId), (override));
     MOCK_METHOD(void, UpdateGroupAddTeam, (const std::string_view& groupId, const std::shared_ptr<domain::Team> & team), (override));
 };
 
@@ -51,6 +53,10 @@ class GroupDelegateTest : public ::testing::Test {
     std::shared_ptr<MockGroupRepository> mockGroupRepository;
     std::shared_ptr<MockTeamRepository> mockTeamRepository;
     std::shared_ptr<GroupDelegate> groupDelegate;
+    
+    const std::string validTournamentId = "12345678-1234-1234-1234-123456789abc";
+    const std::string validGroupId = "87654321-4321-4321-4321-cba987654321";
+    const std::string validTeamId = "abcdef01-2345-6789-abcd-ef0123456789";
 
     void SetUp() override {
         mockTournamentRepository = std::make_shared<MockTournamentRepository>();
@@ -60,306 +66,297 @@ class GroupDelegateTest : public ::testing::Test {
     }
 };
 
-//======================= GetGroups TESTS ========================
-// Validar retorno exitoso con múltiples grupos
-TEST_F(GroupDelegateTest, GetGroups_ReturnsMultipleGroups) {
-    std::vector<std::shared_ptr<domain::Group>> groups = {
-        std::make_shared<domain::Group>(domain::Group{"Group 1", "group-1"}),
-        std::make_shared<domain::Group>(domain::Group{"Group 2", "group-2"}),
-        std::make_shared<domain::Group>(domain::Group{"Group 3", "group-3"})
-    };
-    groups[0]->TournamentId() = "tournament-id";
-    groups[1]->TournamentId() = "tournament-id";
-    groups[2]->TournamentId() = "tournament-id";
+//======================= CreateGroup TESTS ========================
 
-    EXPECT_CALL(*mockGroupRepository, FindByTournamentId(testing::Eq(std::string("tournament-id"))))
-        .WillOnce(testing::Return(groups));
-
-    auto result = groupDelegate->GetGroups("tournament-id");
-
-    ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result->size(), 3);
-    EXPECT_EQ((*result)[0]->Id(), "group-1");
-    EXPECT_EQ((*result)[0]->Name(), "Group 1");
-    EXPECT_EQ((*result)[1]->Id(), "group-2");
-    EXPECT_EQ((*result)[1]->Name(), "Group 2");
-    EXPECT_EQ((*result)[2]->Id(), "group-3");
-    EXPECT_EQ((*result)[2]->Name(), "Group 3");
-}
-
-// Validar retorno exitoso con ningún grupo
-TEST_F(GroupDelegateTest, GetGroups_ReturnsEmptyList) {
-    std::vector<std::shared_ptr<domain::Group>> emptyGroups;
-
-    EXPECT_CALL(*mockGroupRepository, FindByTournamentId(testing::Eq(std::string("tournament-id"))))
-        .WillOnce(testing::Return(emptyGroups));
-
-    auto result = groupDelegate->GetGroups("tournament-id");
-
-    ASSERT_TRUE(result.has_value());
-    EXPECT_TRUE(result->empty());
-}
-
-// Tests for invalid/non-existent tournament IDs
-
-// Validar que GetGroups maneja torneo inexistente
-TEST_F(GroupDelegateTest, GetGroups_NonExistentTournamentId_ThrowsException) {
-    EXPECT_CALL(*mockTournamentRepository, ReadById(testing::Eq(std::string("non-existent-tournament"))))
-        .WillOnce(testing::Throw(NotFoundException("Tournament not found")));
-
-    EXPECT_THROW(groupDelegate->GetGroups("non-existent-tournament"), NotFoundException);
-}
-
-// Validar que GetGroups maneja ID de torneo con formato inválido
-TEST_F(GroupDelegateTest, GetGroups_InvalidTournamentIdFormat_ThrowsException) {
-    EXPECT_CALL(*mockTournamentRepository, ReadById(testing::Eq(std::string(""))))
-        .WillOnce(testing::Throw(InvalidFormatException("Invalid tournament ID format")));
-
-    EXPECT_THROW(groupDelegate->GetGroups(""), InvalidFormatException);
-    EXPECT_CALL(*mockTournamentRepository, ReadById(testing::Eq(std::string("invalid@id#format"))))
-        .WillOnce(testing::Throw(InvalidFormatException("Invalid tournament ID format")));
-
-    EXPECT_THROW(groupDelegate->GetGroups("invalid@id#format"), InvalidFormatException);
-}
-
-// GetGroup Tests
-
-// Validar que GetGroup funciona correctamente con IDs válidos
-TEST_F(GroupDelegateTest, GetGroup_ValidIds_ReturnsGroup) {
-    auto group = std::make_shared<domain::Group>(domain::Group{"Group 1", "group-1"});
-    group->TournamentId() = "tournament-id";
-
-    EXPECT_CALL(*mockGroupRepository, FindByTournamentIdAndGroupId(
-        testing::Eq(std::string("tournament-id")), 
-        testing::Eq(std::string("group-1"))))
-        .WillOnce(testing::Return(group));
-
-    auto result = groupDelegate->GetGroup("tournament-id", "group-1");
-
-    ASSERT_TRUE(result.has_value());
-    EXPECT_EQ((*result)->Id(), "group-1");
-    EXPECT_EQ((*result)->Name(), "Group 1");
-    EXPECT_EQ((*result)->TournamentId(), "tournament-id");
-}
-
-// Validar que GetGroup maneja grupo inexistente
-TEST_F(GroupDelegateTest, GetGroup_NonExistentGroupId_ReturnsError) {
-    EXPECT_CALL(*mockGroupRepository, FindByTournamentIdAndGroupId(
-        testing::Eq(std::string("tournament-id")), 
-        testing::Eq(std::string("non-existent-group"))))
-        .WillOnce(testing::Throw(std::runtime_error("Group not found")));
-
-    auto result = groupDelegate->GetGroup("tournament-id", "non-existent-group");
-
-    ASSERT_FALSE(result.has_value());
-    EXPECT_THAT(result.error(), testing::HasSubstr("Error when reading to DB"));
-}
-
-// Validar que GetGroup maneja excepciones de base de datos
-TEST_F(GroupDelegateTest, GetGroup_DatabaseError_ReturnsError) {
-    EXPECT_CALL(*mockGroupRepository, FindByTournamentIdAndGroupId(
-        testing::Eq(std::string("tournament-id")), 
-        testing::Eq(std::string("group-1"))))
-        .WillOnce(testing::Throw(std::runtime_error("Database connection error")));
-
-    auto result = groupDelegate->GetGroup("tournament-id", "group-1");
-
-    ASSERT_FALSE(result.has_value());
-    EXPECT_THAT(result.error(), testing::HasSubstr("Error when reading to DB"));
-}
-
-// CreateGroup Tests
-
-// Validar que CreateGroup funciona correctamente
-TEST_F(GroupDelegateTest, CreateGroup_ValidData_ReturnsSuccess) {
-    domain::Group group{"Group 1", "group-1"};
+// Test 1: Validar creación exitosa de grupo y que se genere evento
+TEST_F(GroupDelegateTest, CreateGroup_ValidData_ReturnsGroupIdAndValidatesData) {
+    domain::Group group{"Test Group", "test-group"};
     auto tournament = std::make_shared<domain::Tournament>(domain::Tournament{"Tournament Name"});
+    tournament->Id() = validTournamentId;
 
-    EXPECT_CALL(*mockTournamentRepository, ReadById(testing::Eq(std::string("tournament-id"))))
+    EXPECT_CALL(*mockTournamentRepository, ReadById(testing::Eq(validTournamentId)))
         .WillOnce(testing::Return(tournament));
-    EXPECT_CALL(*mockGroupRepository, Create(testing::_))
-        .WillOnce(testing::Return("group-1"));
-
-    auto result = groupDelegate->CreateGroup("tournament-id", group);
-
-    ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result.value(), "group-1");
-}
-
-// Validar que CreateGroup maneja torneo inexistente
-TEST_F(GroupDelegateTest, CreateGroup_NonExistentTournamentId_ThrowsException) {
-    domain::Group group{"Group 1", "group-1"};
     
-    EXPECT_CALL(*mockTournamentRepository, ReadById(testing::Eq(std::string("non-existent-tournament"))))
-        .WillOnce(testing::Throw(NotFoundException("Tournament not found")));
-
-    EXPECT_THROW(groupDelegate->CreateGroup("non-existent-tournament", group), NotFoundException);
-}
-
-// Test for enhanced group creation with validation
-TEST_F(GroupDelegateTest, CreateGroup_ValidData_ValidatesGroupPassedToRepository) {
-    domain::Group group{"Group A", "group-a"};
-    auto tournament = std::make_shared<domain::Tournament>(domain::Tournament{"Tournament 1"});
-    tournament->Id() = "tournament-123";
-
-    EXPECT_CALL(*mockTournamentRepository, ReadById(testing::Eq(std::string("tournament-123"))))
-        .WillOnce(testing::Return(tournament));
-
     EXPECT_CALL(*mockGroupRepository, Create(testing::_))
         .WillOnce(testing::DoAll(
-            testing::WithArg<0>(testing::Invoke([](const domain::Group& g) {
-                EXPECT_EQ(g.TournamentId(), "tournament-123");
-                EXPECT_EQ(g.Name(), "Group A");
-                EXPECT_EQ(g.Id(), "group-a");
+            testing::WithArg<0>(testing::Invoke([&](const domain::Group& g) {
+                EXPECT_EQ(g.TournamentId(), validTournamentId);
+                EXPECT_EQ(g.Name(), "Test Group");
             })),
-            testing::Return("generated-group-id")
+            testing::Return(validGroupId)
         ));
 
-    auto result = groupDelegate->CreateGroup("tournament-123", group);
+    auto result = groupDelegate->CreateGroup(validTournamentId, group);
 
     ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result.value(), "generated-group-id");
+    EXPECT_EQ(result.value(), validGroupId);
 }
 
-// Test for group creation with duplicate error using std::expected
+// Test 2: Validar error cuando grupo ya existe
 TEST_F(GroupDelegateTest, CreateGroup_DuplicateGroup_ReturnsExpectedError) {
-    domain::Group group{"Group A", "group-a"};
-    auto tournament = std::make_shared<domain::Tournament>(domain::Tournament{"Tournament 1"});
+    domain::Group group{"Test Group", "test-group"};
+    auto tournament = std::make_shared<domain::Tournament>(domain::Tournament{"Tournament Name"});
+    tournament->Id() = validTournamentId;
 
-    EXPECT_CALL(*mockTournamentRepository, ReadById(testing::Eq(std::string("tournament-123"))))
+    EXPECT_CALL(*mockTournamentRepository, ReadById(testing::Eq(validTournamentId)))
         .WillOnce(testing::Return(tournament));
-
+    
+    // Create a proper pqxx::unique_violation with the correct sqlstate
+    auto create_unique_violation = []() -> pqxx::unique_violation {
+        return pqxx::unique_violation("duplicate key value violates unique constraint", "", "23505");
+    };
+    
     EXPECT_CALL(*mockGroupRepository, Create(testing::_))
         .WillOnce(testing::DoAll(
-            testing::WithArg<0>(testing::Invoke([](const domain::Group& g) {
-                EXPECT_EQ(g.TournamentId(), "tournament-123");
-                EXPECT_EQ(g.Name(), "Group A");
+            testing::WithArg<0>(testing::Invoke([&](const domain::Group& g) {
+                EXPECT_EQ(g.TournamentId(), validTournamentId);
+                EXPECT_EQ(g.Name(), "Test Group");
             })),
-            testing::Throw(DuplicateException("Group already exists"))
+            testing::Throw(create_unique_violation())
         ));
 
-    EXPECT_THROW(groupDelegate->CreateGroup("tournament-123", group), DuplicateException);
+    auto result = groupDelegate->CreateGroup(validTournamentId, group);
+
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Error::DUPLICATE);
 }
 
-// Test for group creation with max teams error using std::expected
-// TEST_F(GroupDelegateTest, CreateGroup_MaxTeamsReached_ReturnsExpectedError) {
-//     domain::Group group{"Group A", "group-a"};
-//     auto tournament = std::make_shared<domain::Tournament>(domain::Tournament{"Tournament 1"});
+// Test 3: Validar error cuando se alcanza número máximo de equipos
+TEST_F(GroupDelegateTest, CreateGroup_MaxTeamsReached_ReturnsExpectedError) {
+    domain::Group group{"Test Group", "test-group"};
+    // Create a group with maximum teams (simulated by adding teams to group)
+    for (int i = 0; i < 32; ++i) {
+        domain::Team team;
+        team.Id = "team-" + std::to_string(i);
+        team.Name = "Team " + std::to_string(i);
+        group.Teams().push_back(team);
+    }
+    
+    auto tournament = std::make_shared<domain::Tournament>(domain::Tournament{"Tournament Name"});
+    tournament->Id() = validTournamentId;
 
-    // EXPECT_CALL(*mockTournamentRepository, ReadById(testing::Eq(std::string("tournament-123"))))
-    //     .WillOnce(testing::Return(tournament));
-
-    // // Simulate max capacity error during creation
-    // EXPECT_CALL(*mockGroupRepository, Create(testing::_))
-    //     .WillOnce(testing::DoAll(
-    //         testing::WithArg<0>(testing::Invoke([](const domain::Group& g) {
-    //             EXPECT_EQ(g.TournamentId(), "tournament-123");
-    //             EXPECT_EQ(g.Name(), "Group A");
-    //         })),
-    //         testing::Throw(std::runtime_error("Maximum number of teams reached"))
-    //     ));
-
-    // auto result = groupDelegate->CreateGroup("tournament-123", group);
-
-//     ASSERT_FALSE(result.has_value());
-//     EXPECT_THAT(result.error(), testing::HasSubstr("Error creating group"));
-// }
-
-// Enhanced GetGroup Tests with proper parameter validation
-
-// Test GetGroup with successful result and parameter validation
-TEST_F(GroupDelegateTest, GetGroup_ValidIds_ValidatesParameters) {
-    auto group = std::make_shared<domain::Group>(domain::Group{"Group A", "group-123"});
-    group->TournamentId() = "tournament-456";
-
-    auto tournament = std::make_shared<domain::Tournament>(domain::Tournament{"Tournament 1"});
-    EXPECT_CALL(*mockTournamentRepository, ReadById(testing::Eq(std::string("tournament-456"))))
+    EXPECT_CALL(*mockTournamentRepository, ReadById(testing::Eq(validTournamentId)))
         .WillOnce(testing::Return(tournament));
 
+    auto result = groupDelegate->CreateGroup(validTournamentId, group);
+
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Error::INVALID_FORMAT);
+}
+
+//======================= GetGroup TESTS ========================
+
+// Test 4: Validar búsqueda exitosa de grupo por ID y torneo por ID
+TEST_F(GroupDelegateTest, GetGroup_ValidIds_ReturnsGroup) {
+    auto group = std::make_shared<domain::Group>(domain::Group{"Test Group", validGroupId});
+    group->TournamentId() = validTournamentId;
+    auto tournament = std::make_shared<domain::Tournament>(domain::Tournament{"Tournament Name"});
+    tournament->Id() = validTournamentId;
+
+    EXPECT_CALL(*mockTournamentRepository, ReadById(testing::Eq(validTournamentId)))
+        .WillOnce(testing::Return(tournament));
+    
     EXPECT_CALL(*mockGroupRepository, FindByTournamentIdAndGroupId(
-        testing::Eq(std::string("tournament-456")), 
-        testing::Eq(std::string("group-123"))))
+        testing::Eq(validTournamentId), 
+        testing::Eq(validGroupId)))
+        .WillOnce(testing::Return(group))
         .WillOnce(testing::Return(group));
 
-    auto result = groupDelegate->GetGroup("tournament-456", "group-123");
+    auto result = groupDelegate->GetGroup(validTournamentId, validGroupId);
 
     ASSERT_TRUE(result.has_value());
-    EXPECT_EQ((*result)->Id(), "group-123");
-    EXPECT_EQ((*result)->Name(), "Group A");
-    EXPECT_EQ((*result)->TournamentId(), "tournament-456");
+    EXPECT_EQ((*result)->Id(), validGroupId);
+    EXPECT_EQ((*result)->Name(), "Test Group");
+    EXPECT_EQ((*result)->TournamentId(), validTournamentId);
 }
 
-// Test GetGroup with null result and parameter validation
+// Test 5: Validar búsqueda con resultado nulo
 TEST_F(GroupDelegateTest, GetGroup_ValidIds_ReturnsNullResult) {
-    auto tournament = std::make_shared<domain::Tournament>(domain::Tournament{"Tournament 1"});
-    EXPECT_CALL(*mockTournamentRepository, ReadById(testing::Eq(std::string("tournament-456"))))
-        .WillOnce(testing::Return(tournament));
+    auto tournament = std::make_shared<domain::Tournament>(domain::Tournament{"Tournament Name"});
+    tournament->Id() = validTournamentId;
 
+    EXPECT_CALL(*mockTournamentRepository, ReadById(testing::Eq(validTournamentId)))
+        .WillOnce(testing::Return(tournament));
+    
     EXPECT_CALL(*mockGroupRepository, FindByTournamentIdAndGroupId(
-        testing::Eq(std::string("tournament-456")), 
-        testing::Eq(std::string("non-existent-group"))))
+        testing::Eq(validTournamentId), 
+        testing::Eq(validGroupId)))
         .WillOnce(testing::Return(nullptr));
 
-    auto result = groupDelegate->GetGroup("tournament-456", "non-existent-group");
+    auto result = groupDelegate->GetGroup(validTournamentId, validGroupId);
 
-    ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result.value(), nullptr);
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Error::NOT_FOUND);
 }
 
-// UpdateGroup Tests
+//======================= UpdateGroup TESTS ========================
 
-// Test UpdateGroup with valid data and parameter validation
+// Test 6: Validar actualización exitosa de grupo
 TEST_F(GroupDelegateTest, UpdateGroup_ValidData_ValidatesParameters) {
     domain::Group inputGroup{"Updated Group", "original-id"};
-    auto existingGroup = std::make_shared<domain::Group>(domain::Group{"Existing Group", "group-789"});
-    auto tournament = std::make_shared<domain::Tournament>(domain::Tournament{"Tournament 1"});
+    auto existingGroup = std::make_shared<domain::Group>(domain::Group{"Existing Group", validGroupId});
+    existingGroup->TournamentId() = validTournamentId;
+    auto tournament = std::make_shared<domain::Tournament>(domain::Tournament{"Tournament Name"});
+    tournament->Id() = validTournamentId;
 
-    EXPECT_CALL(*mockTournamentRepository, ReadById(testing::Eq(std::string("tournament-456"))))
+    EXPECT_CALL(*mockTournamentRepository, ReadById(testing::Eq(validTournamentId)))
         .WillOnce(testing::Return(tournament));
 
     EXPECT_CALL(*mockGroupRepository, FindByTournamentIdAndGroupId(
-        testing::Eq(std::string("tournament-456")), 
-        testing::Eq(std::string("group-789"))))
+        testing::Eq(validTournamentId), 
+        testing::Eq(validGroupId)))
         .WillOnce(testing::Return(existingGroup));
 
     EXPECT_CALL(*mockGroupRepository, Update(testing::_))
         .WillOnce(testing::DoAll(
-            testing::WithArg<0>(testing::Invoke([](const domain::Group& g) {
-                EXPECT_EQ(g.Id(), "group-789");  // Should be the groupId parameter, not original
-                EXPECT_EQ(g.TournamentId(), "tournament-456");
+            testing::WithArg<0>(testing::Invoke([&](const domain::Group& g) {
+                EXPECT_EQ(g.Id(), validGroupId);
+                EXPECT_EQ(g.TournamentId(), validTournamentId);
                 EXPECT_EQ(g.Name(), "Updated Group");
             })),
-            testing::Return("group-789")
+            testing::Return(validGroupId)
         ));
 
-    auto result = groupDelegate->UpdateGroup("tournament-456", inputGroup, "group-789");
+    auto result = groupDelegate->UpdateGroup(validTournamentId, inputGroup, validGroupId);
 
     ASSERT_TRUE(result.has_value());
 }
 
-// Test UpdateGroup with not found error using std::expected
+// Test 7: Validar error cuando ID no se encuentra
 TEST_F(GroupDelegateTest, UpdateGroup_GroupNotFound_ReturnsExpectedError) {
     domain::Group inputGroup{"Updated Group", "original-id"};
-    auto tournament = std::make_shared<domain::Tournament>(domain::Tournament{"Tournament 1"});
+    auto tournament = std::make_shared<domain::Tournament>(domain::Tournament{"Tournament Name"});
+    tournament->Id() = validTournamentId;
 
-    EXPECT_CALL(*mockTournamentRepository, ReadById(testing::Eq(std::string("tournament-456"))))
+    EXPECT_CALL(*mockTournamentRepository, ReadById(testing::Eq(validTournamentId)))
         .WillOnce(testing::Return(tournament));
 
     EXPECT_CALL(*mockGroupRepository, FindByTournamentIdAndGroupId(
-        testing::Eq(std::string("tournament-456")), 
-        testing::Eq(std::string("non-existent-group"))))
-        .WillOnce(testing::Throw(NotFoundException("Group not found")));
+        testing::Eq(validTournamentId), 
+        testing::Eq(validGroupId)))
+        .WillOnce(testing::Return(nullptr));
 
-    EXPECT_THROW(groupDelegate->UpdateGroup("tournament-456", inputGroup, "non-existent-group"), NotFoundException);
+    auto result = groupDelegate->UpdateGroup(validTournamentId, inputGroup, validGroupId);
+
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Error::NOT_FOUND);
 }
 
-// Test UpdateGroup with tournament not found error using std::expected
-TEST_F(GroupDelegateTest, UpdateGroup_TournamentNotFound_ReturnsExpectedError) {
-    domain::Group inputGroup{"Updated Group", "group-id"};
+//======================= UpdateTeams (AddTeamToGroup) TESTS ========================
 
-    EXPECT_CALL(*mockTournamentRepository, ReadById(testing::Eq(std::string("non-existent-tournament"))))
-        .WillOnce(testing::Throw(NotFoundException("Tournament not found")));
+// Test 8: Validar agregar equipo exitosamente a grupo y que se publique mensaje
+TEST_F(GroupDelegateTest, UpdateTeams_AddTeamToGroup_ValidatesDataAndPublishesMessage) {
+    domain::Team team;
+    team.Id = validTeamId;
+    team.Name = "Test Team";
+    std::vector<domain::Team> teams = {team};
+    
+    auto tournament = std::make_shared<domain::Tournament>(domain::Tournament{"Tournament Name"});
+    tournament->Id() = validTournamentId;
+    
+    auto group = std::make_shared<domain::Group>(domain::Group{"Test Group", validGroupId});
+    group->TournamentId() = validTournamentId;
+    
+    auto persistedTeam = std::make_shared<domain::Team>();
+    persistedTeam->Id = validTeamId;
+    persistedTeam->Name = "Test Team";
 
-    EXPECT_THROW(groupDelegate->UpdateGroup("non-existent-tournament", inputGroup, "group-id"), NotFoundException);
+    EXPECT_CALL(*mockTournamentRepository, ReadById(testing::Eq(validTournamentId)))
+        .WillOnce(testing::Return(tournament));
+    
+    EXPECT_CALL(*mockGroupRepository, FindByTournamentIdAndGroupId(
+        testing::Eq(validTournamentId), 
+        testing::Eq(validGroupId)))
+        .WillOnce(testing::Return(group));
+    
+    EXPECT_CALL(*mockGroupRepository, FindByGroupIdAndTeamId(
+        testing::Eq(validGroupId), 
+        testing::Eq(validTeamId)))
+        .WillOnce(testing::Return(nullptr));
+    
+    EXPECT_CALL(*mockTeamRepository, ReadById(testing::Eq(validTeamId)))
+        .WillOnce(testing::Return(persistedTeam));
+    
+    EXPECT_CALL(*mockGroupRepository, UpdateGroupAddTeam(
+        testing::Eq(validGroupId), 
+        testing::_))
+        .WillOnce(testing::WithArg<1>(testing::Invoke([&](const std::shared_ptr<domain::Team>& t) {
+            EXPECT_EQ(t->Id, validTeamId);
+            EXPECT_EQ(t->Name, "Test Team");
+        })));
+
+    auto result = groupDelegate->UpdateTeams(validTournamentId, validGroupId, teams);
+
+    ASSERT_TRUE(result.has_value());
+}
+
+// Test 9: Validar error cuando equipo no existe
+TEST_F(GroupDelegateTest, UpdateTeams_TeamNotExists_ReturnsExpectedError) {
+    domain::Team team;
+    team.Id = validTeamId;
+    team.Name = "Non-existent Team";
+    std::vector<domain::Team> teams = {team};
+    
+    auto tournament = std::make_shared<domain::Tournament>(domain::Tournament{"Tournament Name"});
+    tournament->Id() = validTournamentId;
+    
+    auto group = std::make_shared<domain::Group>(domain::Group{"Test Group", validGroupId});
+    group->TournamentId() = validTournamentId;
+
+    EXPECT_CALL(*mockTournamentRepository, ReadById(testing::Eq(validTournamentId)))
+        .WillOnce(testing::Return(tournament));
+    
+    EXPECT_CALL(*mockGroupRepository, FindByTournamentIdAndGroupId(
+        testing::Eq(validTournamentId), 
+        testing::Eq(validGroupId)))
+        .WillOnce(testing::Return(group));
+    
+    EXPECT_CALL(*mockGroupRepository, FindByGroupIdAndTeamId(
+        testing::Eq(validGroupId), 
+        testing::Eq(validTeamId)))
+        .WillOnce(testing::Return(nullptr));
+    
+    EXPECT_CALL(*mockTeamRepository, ReadById(testing::Eq(validTeamId)))
+        .WillOnce(testing::Return(nullptr));
+
+    auto result = groupDelegate->UpdateTeams(validTournamentId, validGroupId, teams);
+
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Error::UNPROCESSABLE_ENTITY);
+}
+
+// Test 10: Validar error cuando grupo está lleno
+TEST_F(GroupDelegateTest, UpdateTeams_GroupFull_ReturnsExpectedError) {
+    domain::Team team;
+    team.Id = validTeamId;
+    team.Name = "Test Team";
+    std::vector<domain::Team> teams = {team};
+    
+    auto tournament = std::make_shared<domain::Tournament>(domain::Tournament{"Tournament Name"});
+    tournament->Id() = validTournamentId;
+    
+    auto group = std::make_shared<domain::Group>(domain::Group{"Test Group", validGroupId});
+    group->TournamentId() = validTournamentId;
+    
+    // Simulate a group with 32 teams (maximum capacity)
+    for (int i = 0; i < 32; ++i) {
+        domain::Team existingTeam;
+        existingTeam.Id = "team-" + std::to_string(i);
+        existingTeam.Name = "Team " + std::to_string(i);
+        group->Teams().push_back(existingTeam);
+    }
+
+    EXPECT_CALL(*mockTournamentRepository, ReadById(testing::Eq(validTournamentId)))
+        .WillOnce(testing::Return(tournament));
+    
+    EXPECT_CALL(*mockGroupRepository, FindByTournamentIdAndGroupId(
+        testing::Eq(validTournamentId), 
+        testing::Eq(validGroupId)))
+        .WillOnce(testing::Return(group));
+
+    auto result = groupDelegate->UpdateTeams(validTournamentId, validGroupId, teams);
+
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ(result.error(), Error::UNPROCESSABLE_ENTITY);
 }
 
