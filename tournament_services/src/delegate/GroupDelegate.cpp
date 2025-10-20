@@ -15,7 +15,7 @@ GroupDelegate::GroupDelegate(const std::shared_ptr<TournamentRepository>& tourna
 
 std::expected<std::vector<std::shared_ptr<domain::Group>>, Error> GroupDelegate::GetGroups(const std::string_view& tournamentId) {
     // Validacion de formato de UUID para tournamentId
-    if (!std::regex_match(std::string(tournamentId), ID_GROUPVALUE)) {
+    if (!std::regex_match(std::string(tournamentId), ID_VALUE)) {
         return std::unexpected(Error::INVALID_FORMAT);
     }
     // Validacion de existencia del torneo
@@ -34,7 +34,7 @@ std::expected<std::vector<std::shared_ptr<domain::Group>>, Error> GroupDelegate:
 
 std::expected<std::shared_ptr<domain::Group>, Error> GroupDelegate::GetGroup(const std::string_view& tournamentId, const std::string_view& groupId) {
     // Validacion de formato de UUID para tournamentId y groupId
-    if (!std::regex_match(std::string(tournamentId), ID_GROUPVALUE) || !std::regex_match(std::string(groupId), ID_GROUPVALUE)) {
+    if (!std::regex_match(std::string(tournamentId), ID_VALUE) || !std::regex_match(std::string(groupId), ID_VALUE)) {
         return std::unexpected(Error::INVALID_FORMAT);
     }
     // Validacion de existencia del torneo 
@@ -57,7 +57,7 @@ std::expected<std::shared_ptr<domain::Group>, Error> GroupDelegate::GetGroup(con
 
 std::expected<std::string, Error> GroupDelegate::CreateGroup(const std::string_view& tournamentId, const domain::Group& group) {
     // Validacion de formato de UUID para tournamentId
-    if (!std::regex_match(std::string(tournamentId), ID_GROUPVALUE)) {
+    if (!std::regex_match(std::string(tournamentId), ID_VALUE)) {
         return std::unexpected(Error::INVALID_FORMAT);
     }
     // Validacion de formato del grupo
@@ -74,7 +74,7 @@ std::expected<std::string, Error> GroupDelegate::CreateGroup(const std::string_v
     if (!g.Teams().empty()) {
         for (auto& t : g.Teams()) {
             // Validacion de formato UUID de cada equipo
-            if (!std::regex_match(t.Id, ID_GROUPVALUE)) {
+            if (!std::regex_match(t.Id, ID_VALUE)) {
                 return std::unexpected(Error::INVALID_FORMAT);
             }
             // Validacion de existencia de cada equipo
@@ -102,7 +102,7 @@ std::expected<std::string, Error> GroupDelegate::CreateGroup(const std::string_v
 
 std::expected<void, Error> GroupDelegate::UpdateGroup(const std::string_view& tournamentId, const domain::Group& group, const std::string_view& groupId) {
     // Validacion de formato de UUID para tournamentId y groupId
-    if (!std::regex_match(std::string(tournamentId), ID_GROUPVALUE) || !std::regex_match(std::string(groupId), ID_GROUPVALUE)) {
+    if (!std::regex_match(std::string(tournamentId), ID_VALUE) || !std::regex_match(std::string(groupId), ID_VALUE)) {
         return std::unexpected(Error::INVALID_FORMAT);
     }
     // Validacion de formato del grupo
@@ -140,7 +140,7 @@ std::expected<void, Error> GroupDelegate::UpdateGroup(const std::string_view& to
 }
 std::expected<void, Error> GroupDelegate::RemoveGroup(const std::string_view& tournamentId, const std::string_view& groupId) {
     // Validacion de formato de UUID para tournamentId y groupId
-    if (!std::regex_match(std::string(tournamentId), ID_GROUPVALUE) || !std::regex_match(std::string(groupId), ID_GROUPVALUE)) {
+    if (!std::regex_match(std::string(tournamentId), ID_VALUE) || !std::regex_match(std::string(groupId), ID_VALUE)) {
         return std::unexpected(Error::INVALID_FORMAT);
     }
     // Validacion de existencia del torneo
@@ -163,7 +163,7 @@ std::expected<void, Error> GroupDelegate::RemoveGroup(const std::string_view& to
 
 std::expected<void, Error> GroupDelegate::UpdateTeams(const std::string_view& tournamentId, const std::string_view& groupId, const std::vector<domain::Team>& teams) {
     // Validacion de formato de UUID para tournamentId y groupId
-    if (!std::regex_match(std::string(tournamentId), ID_GROUPVALUE) || !std::regex_match(std::string(groupId), ID_GROUPVALUE)) {
+    if (!std::regex_match(std::string(tournamentId), ID_VALUE) || !std::regex_match(std::string(groupId), ID_VALUE)) {
         return std::unexpected(Error::INVALID_FORMAT);
     }
     // Validacion de existencia del torneo
@@ -188,7 +188,7 @@ std::expected<void, Error> GroupDelegate::UpdateTeams(const std::string_view& to
     }
     for (const auto& team : teams) {
         // Validacion de formato UUID de cada equipo
-        if (!std::regex_match(team.Id, ID_GROUPVALUE)) {
+        if (!std::regex_match(team.Id, ID_VALUE)) {
             return std::unexpected(Error::INVALID_FORMAT);
         }
         // Validacion de existencia de cada equipo

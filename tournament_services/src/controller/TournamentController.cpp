@@ -31,7 +31,7 @@ static int mapErrorToStatus(const Error err) {
 }
 
 crow::response TournamentController::getTournament(const std::string& tournamentId) {
-    if (!std::regex_match(tournamentId, ID_VALUE_TOURNAMENT)) {
+    if (!std::regex_match(tournamentId, ID_VALUE)) {
         return crow::response{crow::BAD_REQUEST, "Invalid ID format"};
     }
 
@@ -121,7 +121,7 @@ crow::response TournamentController::updateTournament(const crow::request& reque
 crow::response TournamentController::deleteTournament(const std::string& tournamentId) {
     crow::response response;
 
-    if (!std::regex_match(tournamentId, ID_VALUE_TOURNAMENT)) {
+    if (!std::regex_match(tournamentId, ID_VALUE)) {
         response.code = crow::BAD_REQUEST;
         response.body = "Invalid ID format";
         return response;

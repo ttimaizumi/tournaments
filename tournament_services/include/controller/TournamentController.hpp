@@ -10,8 +10,7 @@
 #include <crow.h>
 
 #include "delegate/ITournamentDelegate.hpp"
-
-static const std::regex ID_VALUE_TOURNAMENT("[A-Za-z0-9\\-]+");
+#include "domain/Constants.hpp"
 
 class TournamentController {
     std::shared_ptr<ITournamentDelegate> tournamentDelegate;

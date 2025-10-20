@@ -12,8 +12,7 @@
 #include <regex>
 
 #include "delegate/ITeamDelegate.hpp"
-
-static const std::regex ID_VALUE("[A-Za-z0-9\\-]+");
+#include "domain/Constants.hpp"
 
 class TeamController {
     std::shared_ptr<ITeamDelegate> teamDelegate;

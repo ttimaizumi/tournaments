@@ -7,13 +7,11 @@
 #include <pqxx/pqxx>
 
 #include "exception/Error.hpp"
+#include "domain/Constants.hpp"
 
 TeamDelegate::TeamDelegate(
     std::shared_ptr<IRepository<domain::Team, std::string_view>> repository)
     : teamRepository(std::move(repository)) {}
-
-// Placeholder UUID-ish regex (replace with your real one)
-static const std::regex ID_REGEX(R"(^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$)");
 
 std::expected<std::vector<std::shared_ptr<domain::Team>>, Error>
 TeamDelegate::GetAllTeams() {
@@ -27,7 +25,7 @@ TeamDelegate::GetAllTeams() {
 }
 
 std::expected<std::shared_ptr<domain::Team>, Error> TeamDelegate::GetTeam(std::string_view id) {
-  if (!std::regex_match(std::string{id}, ID_REGEX)) {
+  if (!std::regex_match(std::string{id}, ID_VALUE)) {
     return std::unexpected(Error::INVALID_FORMAT);
   }
 
@@ -42,6 +40,7 @@ std::expected<std::shared_ptr<domain::Team>, Error> TeamDelegate::GetTeam(std::s
     if (e.sqlstate() == "22P02") {
       return std::unexpected(Error::INVALID_FORMAT);
     }
+    return std::unexpected(Error::UNKNOWN_ERROR);
 
   } catch (const std::exception& e) {
     return std::unexpected(Error::UNKNOWN_ERROR);
@@ -74,7 +73,7 @@ std::expected<std::string, Error> TeamDelegate::CreateTeam(
 
 std::expected<std::string, Error> TeamDelegate::UpdateTeam(
     const domain::Team& team) {
-  if (team.Id.empty() || !std::regex_match(team.Id, ID_REGEX)) {
+  if (team.Id.empty() || !std::regex_match(team.Id, ID_VALUE)) {
     return std::unexpected(Error::INVALID_FORMAT);
   }
 
