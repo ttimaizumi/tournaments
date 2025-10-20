@@ -71,12 +71,13 @@ TEST_F(TournamentDelegateTest, CreateTournament_ValidInsertion_ReturnsGeneratedI
 
     auto result = tournamentDelegate->CreateTournament(tournament);
 
-    EXPECT_EQ(expectedId, result);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(expectedId, result.value());
     EXPECT_EQ("Mundial 2025", capturedTournament.Name());
 }
 
-// Test 2: Crear torneo - inserción fallida retorna cadena vacía (error)
-TEST_F(TournamentDelegateTest, CreateTournament_FailedInsertion_ReturnsEmptyString) {
+// Test 2: Crear torneo - inserción fallida retorna std::expected error
+TEST_F(TournamentDelegateTest, CreateTournament_FailedInsertion_ReturnsExpectedError) {
     auto tournament = std::make_shared<domain::Tournament>("Duplicate Tournament");
 
     EXPECT_CALL(*repositoryMock, Create(testing::_))
@@ -85,9 +86,10 @@ TEST_F(TournamentDelegateTest, CreateTournament_FailedInsertion_ReturnsEmptyStri
     EXPECT_CALL(*producerMock, SendMessage(testing::_, testing::_))
             .Times(0);
 
-    EXPECT_THROW({
-                     tournamentDelegate->CreateTournament(tournament);
-                 }, std::runtime_error);
+    auto result = tournamentDelegate->CreateTournament(tournament);
+
+    ASSERT_FALSE(result.has_value());
+    EXPECT_TRUE(result.error().find("Failed to create tournament") != std::string::npos);
 }
 
 // Test 3: Buscar por ID - validar transferencia de ID y retorno con objeto
@@ -183,13 +185,14 @@ TEST_F(TournamentDelegateTest, UpdateTournament_ValidUpdate_ReturnsUpdatedId) {
 
     auto result = tournamentDelegate->UpdateTournament(tournament);
 
-    EXPECT_EQ(tournamentId, result);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(tournamentId, result.value());
     EXPECT_EQ(tournamentId, capturedTournament.Id());
     EXPECT_EQ("Updated Tournament Name", capturedTournament.Name());
 }
 
-// Test 8: Actualizar torneo - búsqueda no exitosa retorna cadena vacía (error)
-TEST_F(TournamentDelegateTest, UpdateTournament_NonExistentId_ReturnsEmptyString) {
+// Test 8: Actualizar torneo - búsqueda no exitosa retorna std::expected error
+TEST_F(TournamentDelegateTest, UpdateTournament_NonExistentId_ReturnsExpectedError) {
     const std::string nonExistentId = "non-existent-uuid";
     domain::Tournament tournament("Some Tournament");
     tournament.Id() = nonExistentId;
@@ -197,7 +200,8 @@ TEST_F(TournamentDelegateTest, UpdateTournament_NonExistentId_ReturnsEmptyString
     EXPECT_CALL(*repositoryMock, Update(testing::_))
             .WillOnce(testing::Throw(std::runtime_error("Tournament not found")));
 
-    EXPECT_THROW({
-                     tournamentDelegate->UpdateTournament(tournament);
-                 }, std::runtime_error);
+    auto result = tournamentDelegate->UpdateTournament(tournament);
+
+    ASSERT_FALSE(result.has_value());
+    EXPECT_TRUE(result.error().find("Failed to update tournament") != std::string::npos);
 }

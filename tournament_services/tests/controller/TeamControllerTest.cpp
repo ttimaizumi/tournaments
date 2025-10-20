@@ -10,8 +10,8 @@ class TeamDelegateMock : public ITeamDelegate {
 public:
     MOCK_METHOD(std::shared_ptr<domain::Team>, GetTeam, (const std::string_view id), (override));
     MOCK_METHOD(std::vector<std::shared_ptr<domain::Team>>, GetAllTeams, (), (override));
-    MOCK_METHOD(std::string_view, SaveTeam, (const domain::Team&), (override));
-    MOCK_METHOD(std::string_view, UpdateTeam, (const domain::Team&), (override));
+    MOCK_METHOD((std::expected<std::string, std::string>), SaveTeam, (const domain::Team&), (override));
+    MOCK_METHOD((std::expected<std::string, std::string>), UpdateTeam, (const domain::Team&), (override));
 };
 
 class TeamControllerTest : public ::testing::Test {
@@ -115,7 +115,7 @@ TEST_F(TeamControllerTest, SaveTeam_ValidRequest_Returns201WithLocation) {
     EXPECT_CALL(*teamDelegateMock, SaveTeam(testing::_))
             .WillOnce(testing::DoAll(
                     testing::SaveArg<0>(&capturedTeam),
-                    testing::Return(expectedId)
+                    testing::Return(std::expected<std::string, std::string>(expectedId))
             ));
 
     nlohmann::json teamRequestBody = {{"name", "New Team"}};
@@ -137,7 +137,7 @@ TEST_F(TeamControllerTest, SaveTeam_DuplicateName_Returns409Conflict) {
     EXPECT_CALL(*teamDelegateMock, SaveTeam(testing::_))
             .WillOnce(testing::DoAll(
                     testing::SaveArg<0>(&capturedTeam),
-                    testing::Return("")
+                    testing::Return(std::unexpected<std::string>("Team already exists"))
             ));
 
     nlohmann::json teamRequestBody = {{"name", "Existing Team"}};
@@ -170,7 +170,7 @@ TEST_F(TeamControllerTest, UpdateTeam_ValidRequest_Returns204NoContent) {
     EXPECT_CALL(*teamDelegateMock, UpdateTeam(testing::_))
             .WillOnce(testing::DoAll(
                     testing::SaveArg<0>(&capturedTeam),
-                    testing::Return(teamId)
+                    testing::Return(std::expected<std::string, std::string>(teamId))
             ));
 
     nlohmann::json teamRequestBody = {{"name", "Updated Team Name"}};
@@ -193,7 +193,7 @@ TEST_F(TeamControllerTest, UpdateTeam_TeamNotFound_Returns404) {
     EXPECT_CALL(*teamDelegateMock, UpdateTeam(testing::_))
             .WillOnce(testing::DoAll(
                     testing::SaveArg<0>(&capturedTeam),
-                    testing::Return("") // Empty string indica que no existe
+                    testing::Return(std::unexpected<std::string>("Team not found"))
             ));
 
     nlohmann::json teamRequestBody = {{"name", "Updated Team"}};

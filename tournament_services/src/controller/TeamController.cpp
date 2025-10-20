@@ -43,15 +43,15 @@ crow::response TeamController::SaveTeam(const crow::request& request) const {
     auto requestBody = nlohmann::json::parse(request.body);
     domain::Team team = requestBody;
 
-    auto createdId = teamDelegate->SaveTeam(team);
+    auto createdIdResult = teamDelegate->SaveTeam(team);
 
-    if(createdId.empty()) {
+    if(!createdIdResult.has_value()) {
         response.code = crow::CONFLICT;
         return response;
     }
 
     response.code = crow::CREATED;
-    response.add_header("location", createdId.data());
+    response.add_header("location", createdIdResult.value());
 
     return response;
 }
@@ -69,9 +69,9 @@ crow::response TeamController::UpdateTeam(const crow::request& request, const st
     domain::Team team = body;
     team.Id = teamId;
 
-    std::string updatedId(teamDelegate->UpdateTeam(team));
+    auto updatedIdResult = teamDelegate->UpdateTeam(team);
 
-    if(updatedId.empty()) {
+    if(!updatedIdResult.has_value()) {
         return crow::response{crow::NOT_FOUND};
     }
 

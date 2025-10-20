@@ -47,7 +47,8 @@ TEST_F(TeamDelegateTest, SaveTeam_ValidTeam_ReturnsGeneratedId) {
 
     auto result = teamDelegate->SaveTeam(team);
 
-    EXPECT_EQ(expectedId, result);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(expectedId, result.value());
     EXPECT_EQ("New Team", capturedTeam.Name);
 }
 
@@ -64,9 +65,10 @@ TEST_F(TeamDelegateTest, SaveTeam_TransfersCorrectTeamToRepository) {
 
     auto result = teamDelegate->SaveTeam(inputTeam);
 
+    ASSERT_TRUE(result.has_value());
     EXPECT_EQ("Team Alpha", capturedTeam.Name);
     EXPECT_EQ("", capturedTeam.Id);
-    EXPECT_EQ("new-id-456", result);
+    EXPECT_EQ("new-id-456", result.value());
 }
 
 // Test 3: Buscar equipo por ID - resultado con objeto válido
@@ -169,7 +171,8 @@ TEST_F(TeamDelegateTest, UpdateTeam_ValidTeam_ReturnsTeamId) {
 
     auto result = teamDelegate->UpdateTeam(team);
 
-    EXPECT_EQ("team-id-update", result);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ("team-id-update", result.value());
     EXPECT_EQ("team-id-update", capturedTeam.Id);
     EXPECT_EQ("Updated Team Name", capturedTeam.Name);
 }
@@ -187,9 +190,10 @@ TEST_F(TeamDelegateTest, UpdateTeam_TransfersCorrectTeamToRepository) {
 
     auto result = teamDelegate->UpdateTeam(inputTeam);
 
+    ASSERT_TRUE(result.has_value());
     EXPECT_EQ("update-id-789", capturedTeam.Id);
     EXPECT_EQ("Modified Team", capturedTeam.Name);
-    EXPECT_EQ("update-id-789", result);
+    EXPECT_EQ("update-id-789", result.value());
 }
 
 // Test 11: Actualizar equipo - verifica que Update es llamado
@@ -200,6 +204,31 @@ TEST_F(TeamDelegateTest, UpdateTeam_CallsRepositoryUpdate) {
             .Times(1)
             .WillOnce(testing::Return("test-id"));
 
-    teamDelegate->UpdateTeam(team);
+    auto result = teamDelegate->UpdateTeam(team);
 
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ("test-id", result.value());
+}
+
+// Test 12: Crear equipo - inserción fallida retorna error usando std::expected
+TEST_F(TeamDelegateTest, SaveTeam_FailedInsertion_ReturnsExpectedError) {
+    domain::Team team{"", "Duplicate Team"};
+
+    EXPECT_CALL(*repositoryMock, Create(testing::_))
+            .WillOnce(testing::Throw(std::runtime_error("Database error")));
+
+    auto result = teamDelegate->SaveTeam(team);
+
+    ASSERT_FALSE(result.has_value());
+    EXPECT_TRUE(result.error().find("Failed to create team") != std::string::npos);
+}
+
+// Test 13: Actualizar equipo - ID no encontrado retorna error usando std::expected
+TEST_F(TeamDelegateTest, UpdateTeam_TeamNotFound_ReturnsExpectedError) {
+    domain::Team team{"non-existent-id", "Some Team"};
+
+    auto result = teamDelegate->UpdateTeam(team);
+
+    ASSERT_FALSE(result.has_value());
+    EXPECT_EQ("Team not found", result.error());
 }
