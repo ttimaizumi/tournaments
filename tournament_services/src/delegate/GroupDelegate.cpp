@@ -69,6 +69,10 @@ std::expected<std::string, Error> GroupDelegate::CreateGroup(const std::string_v
     if (tournament == nullptr) {
         return std::unexpected(Error::NOT_FOUND);
     }
+    // Validacion de cantidad maxima de equipos en el grupo
+    if (group.Teams().size() > 32) {
+        return std::unexpected(Error::UNPROCESSABLE_ENTITY);
+    }
     domain::Group g = group;
     g.TournamentId() = tournament->Id();
     if (!g.Teams().empty()) {
@@ -177,7 +181,7 @@ std::expected<void, Error> GroupDelegate::UpdateTeams(const std::string_view& to
         return std::unexpected(Error::NOT_FOUND);
     }
     // Validacion de cantidad maxima de equipos en el grupo
-    if (group->Teams().size() + teams.size() >= 32) {
+    if (group->Teams().size() + teams.size() > 32) {
         return std::unexpected(Error::UNPROCESSABLE_ENTITY);
     }
     for (const auto& team : teams) {
