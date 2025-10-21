@@ -267,8 +267,8 @@ TEST_F(GroupControllerTest, AddTeams_UnprocessableEntity) {
     request.body = requestJson.dump();
     
     crow::response response = groupController->AddTeams(request, tournamentId, groupId);
-    
-    EXPECT_EQ(422, response.code);
+
+    EXPECT_EQ(crow::NOT_ACCEPTABLE, response.code);
     EXPECT_EQ("Error", response.body);
 }
 
@@ -297,7 +297,7 @@ TEST_F(GroupControllerTest, AddTeams_GroupFull) {
     request.body = requestJson.dump();
     
     crow::response response = groupController->AddTeams(request, tournamentId, groupId);
-    
-    EXPECT_EQ(422, response.code);
+
+    EXPECT_EQ(crow::NOT_ACCEPTABLE, response.code);
     EXPECT_EQ("Error", response.body);
 }
