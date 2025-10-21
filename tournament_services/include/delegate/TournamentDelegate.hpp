@@ -11,6 +11,7 @@
 #include "exception/Error.hpp"
 #include "persistence/repository/IRepository.hpp"
 #include "delegate/ITournamentDelegate.hpp"
+#include "domain/Constants.hpp"
 
 class TournamentDelegate : public ITournamentDelegate {
 public:

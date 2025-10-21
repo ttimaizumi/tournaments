@@ -14,6 +14,7 @@ TournamentDelegate::TournamentDelegate(
 
 std::expected<std::vector<std::shared_ptr<domain::Tournament>>, Error>
 TournamentDelegate::ReadAll() {
+
   try {
     auto tournaments = tournamentRepository->ReadAll();
     return tournaments;
@@ -24,7 +25,9 @@ TournamentDelegate::ReadAll() {
 }
 
 std::expected<std::shared_ptr<domain::Tournament>, Error> TournamentDelegate::GetTournament(std::string_view id) {
-
+  if (!std::regex_match(std::string(id), ID_VALUE)) {
+    return std::unexpected(Error::INVALID_FORMAT);
+  }
   try {
     auto tournament = tournamentRepository->ReadById(std::string(id));
     if (!tournament) {
@@ -44,10 +47,13 @@ std::expected<std::shared_ptr<domain::Tournament>, Error> TournamentDelegate::Ge
 }
 
 std::expected<std::string, Error> TournamentDelegate::CreateTournament(
-    const domain::Tournament& tournament) {
-  if (!tournament.Id().empty() || tournament.Name().empty()) {
-    return std::unexpected(Error::INVALID_FORMAT);
-  }
+
+  const domain::Tournament& tournament) {
+
+    if (!tournament.Id().empty() || tournament.Name().empty()) {
+      return std::unexpected(Error::INVALID_FORMAT);
+    }
+
 
   try {
     auto id_view = tournamentRepository->Create(tournament);
@@ -69,6 +75,9 @@ std::expected<std::string, Error> TournamentDelegate::CreateTournament(
 
 std::expected<std::string, Error> TournamentDelegate::UpdateTournament(
     const domain::Tournament& tournament) {
+    if (!std::regex_match(std::string(tournament.Id()), ID_VALUE)) {
+      return std::unexpected(Error::INVALID_FORMAT);
+    }
 
   try {
     auto updated_view = tournamentRepository->Update(tournament);
