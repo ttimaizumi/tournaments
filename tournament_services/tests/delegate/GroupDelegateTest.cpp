@@ -11,6 +11,7 @@
 #include "persistence/repository/IGroupRepository.hpp"
 #include "persistence/repository/TournamentRepository.hpp"
 #include "persistence/repository/TeamRepository.hpp"
+#include "cms/IQueueMessageProducer.hpp"
 #include "exception/Error.hpp"
 
 class MockGroupRepository : public IGroupRepository {
@@ -66,10 +67,10 @@ class GroupDelegateTest : public ::testing::Test {
     }
 };
 
-//======================= CreateGroup TESTS ========================
+// Tests de CreateGroup
 
-// Test 1: Validar creación exitosa de grupo y que se genere evento
-TEST_F(GroupDelegateTest, CreateGroup_ValidData_ReturnsGroupIdAndValidatesData) {
+// Validar creacion exitosa de grupo y que se genere evento
+TEST_F(GroupDelegateTest, CreateGroup_Id) {
     domain::Group group{"Test Group", "test-group"};
     auto tournament = std::make_shared<domain::Tournament>(domain::Tournament{"Tournament Name"});
     tournament->Id() = validTournamentId;
@@ -92,8 +93,8 @@ TEST_F(GroupDelegateTest, CreateGroup_ValidData_ReturnsGroupIdAndValidatesData) 
     EXPECT_EQ(result.value(), validGroupId);
 }
 
-// Test 2: Validar error cuando grupo ya existe
-TEST_F(GroupDelegateTest, CreateGroup_DuplicateGroup_ReturnsExpectedError) {
+// Validar error cuando grupo ya existe
+TEST_F(GroupDelegateTest, CreateGroup_Error) {
     domain::Group group{"Test Group", "test-group"};
     auto tournament = std::make_shared<domain::Tournament>(domain::Tournament{"Tournament Name"});
     tournament->Id() = validTournamentId;
@@ -101,7 +102,6 @@ TEST_F(GroupDelegateTest, CreateGroup_DuplicateGroup_ReturnsExpectedError) {
     EXPECT_CALL(*mockTournamentRepository, ReadById(testing::Eq(validTournamentId)))
         .WillOnce(testing::Return(tournament));
     
-    // Create a proper pqxx::unique_violation with the correct sqlstate
     auto create_unique_violation = []() -> pqxx::unique_violation {
         return pqxx::unique_violation("duplicate key value violates unique constraint", "", "23505");
     };
@@ -121,10 +121,9 @@ TEST_F(GroupDelegateTest, CreateGroup_DuplicateGroup_ReturnsExpectedError) {
     EXPECT_EQ(result.error(), Error::DUPLICATE);
 }
 
-// Test 3: Validar error cuando se alcanza número máximo de equipos
-TEST_F(GroupDelegateTest, CreateGroup_MaxTeamsReached_ReturnsExpectedError) {
+// Validar error cuando se alcanza numero maximo de equipos
+TEST_F(GroupDelegateTest, CreateGroup_MaxTeams) {
     domain::Group group{"Test Group", "test-group"};
-    // Create a group with maximum teams (simulated by adding teams to group)
     for (int i = 0; i < 32; ++i) {
         domain::Team team;
         team.Id = "team-" + std::to_string(i);
@@ -138,16 +137,19 @@ TEST_F(GroupDelegateTest, CreateGroup_MaxTeamsReached_ReturnsExpectedError) {
     EXPECT_CALL(*mockTournamentRepository, ReadById(testing::Eq(validTournamentId)))
         .WillOnce(testing::Return(tournament));
 
+    EXPECT_CALL(*mockGroupRepository, Create(testing::_))
+        .Times(0);
+
     auto result = groupDelegate->CreateGroup(validTournamentId, group);
 
     ASSERT_FALSE(result.has_value());
-    EXPECT_EQ(result.error(), Error::INVALID_FORMAT);
+    EXPECT_EQ(result.error(), Error::INVALID_FORMAT); 
 }
 
-//======================= GetGroup TESTS ========================
+// Tests de GetGroup
 
-// Test 4: Validar búsqueda exitosa de grupo por ID y torneo por ID
-TEST_F(GroupDelegateTest, GetGroup_ValidIds_ReturnsGroup) {
+// Validar busqueda exitosa de grupo por ID y torneo por ID
+TEST_F(GroupDelegateTest, GetGroup_Ok) {
     auto group = std::make_shared<domain::Group>(domain::Group{"Test Group", validGroupId});
     group->TournamentId() = validTournamentId;
     auto tournament = std::make_shared<domain::Tournament>(domain::Tournament{"Tournament Name"});
@@ -170,8 +172,8 @@ TEST_F(GroupDelegateTest, GetGroup_ValidIds_ReturnsGroup) {
     EXPECT_EQ((*result)->TournamentId(), validTournamentId);
 }
 
-// Test 5: Validar búsqueda con resultado nulo
-TEST_F(GroupDelegateTest, GetGroup_ValidIds_ReturnsNullResult) {
+// Validar busqueda con resultado nulo
+TEST_F(GroupDelegateTest, GetGroup_NotFound) {
     auto tournament = std::make_shared<domain::Tournament>(domain::Tournament{"Tournament Name"});
     tournament->Id() = validTournamentId;
 
@@ -189,10 +191,10 @@ TEST_F(GroupDelegateTest, GetGroup_ValidIds_ReturnsNullResult) {
     EXPECT_EQ(result.error(), Error::NOT_FOUND);
 }
 
-//======================= UpdateGroup TESTS ========================
+// Tests de UpdateGroup
 
-// Test 6: Validar actualización exitosa de grupo
-TEST_F(GroupDelegateTest, UpdateGroup_ValidData_ValidatesParameters) {
+// Validar actualizacion exitosa de grupo
+TEST_F(GroupDelegateTest, UpdateGroup_Ok) {
     domain::Group inputGroup{"Updated Group", "original-id"};
     auto existingGroup = std::make_shared<domain::Group>(domain::Group{"Existing Group", validGroupId});
     existingGroup->TournamentId() = validTournamentId;
@@ -222,8 +224,8 @@ TEST_F(GroupDelegateTest, UpdateGroup_ValidData_ValidatesParameters) {
     ASSERT_TRUE(result.has_value());
 }
 
-// Test 7: Validar error cuando ID no se encuentra
-TEST_F(GroupDelegateTest, UpdateGroup_GroupNotFound_ReturnsExpectedError) {
+// Validar error cuando ID no se encuentra
+TEST_F(GroupDelegateTest, UpdateGroup_NotFound) {
     domain::Group inputGroup{"Updated Group", "original-id"};
     auto tournament = std::make_shared<domain::Tournament>(domain::Tournament{"Tournament Name"});
     tournament->Id() = validTournamentId;
@@ -242,10 +244,10 @@ TEST_F(GroupDelegateTest, UpdateGroup_GroupNotFound_ReturnsExpectedError) {
     EXPECT_EQ(result.error(), Error::NOT_FOUND);
 }
 
-//======================= UpdateTeams (AddTeamToGroup) TESTS ========================
+// Tests de UpdateTeams
 
-// Test 8: Validar agregar equipo exitosamente a grupo y que se publique mensaje
-TEST_F(GroupDelegateTest, UpdateTeams_AddTeamToGroup_ValidatesDataAndPublishesMessage) {
+// Validar agregar equipo exitosamente a grupo y que se publique mensaje
+TEST_F(GroupDelegateTest, UpdateTeams_Ok) {
     domain::Team team;
     team.Id = validTeamId;
     team.Name = "Test Team";
@@ -290,8 +292,8 @@ TEST_F(GroupDelegateTest, UpdateTeams_AddTeamToGroup_ValidatesDataAndPublishesMe
     ASSERT_TRUE(result.has_value());
 }
 
-// Test 9: Validar error cuando equipo no existe
-TEST_F(GroupDelegateTest, UpdateTeams_TeamNotExists_ReturnsExpectedError) {
+// Validar error cuando equipo no existe
+TEST_F(GroupDelegateTest, UpdateTeams_TeamNotFound) {
     domain::Team team;
     team.Id = validTeamId;
     team.Name = "Non-existent Team";
@@ -325,8 +327,8 @@ TEST_F(GroupDelegateTest, UpdateTeams_TeamNotExists_ReturnsExpectedError) {
     EXPECT_EQ(result.error(), Error::UNPROCESSABLE_ENTITY);
 }
 
-// Test 10: Validar error cuando grupo está lleno
-TEST_F(GroupDelegateTest, UpdateTeams_GroupFull_ReturnsExpectedError) {
+// Validar error cuando grupo esta lleno
+TEST_F(GroupDelegateTest, UpdateTeams_GroupFull) {
     domain::Team team;
     team.Id = validTeamId;
     team.Name = "Test Team";
@@ -338,7 +340,6 @@ TEST_F(GroupDelegateTest, UpdateTeams_GroupFull_ReturnsExpectedError) {
     auto group = std::make_shared<domain::Group>(domain::Group{"Test Group", validGroupId});
     group->TournamentId() = validTournamentId;
     
-    // Simulate a group with 32 teams (maximum capacity)
     for (int i = 0; i < 32; ++i) {
         domain::Team existingTeam;
         existingTeam.Id = "team-" + std::to_string(i);
@@ -359,4 +360,3 @@ TEST_F(GroupDelegateTest, UpdateTeams_GroupFull_ReturnsExpectedError) {
     ASSERT_FALSE(result.has_value());
     EXPECT_EQ(result.error(), Error::UNPROCESSABLE_ENTITY);
 }
-
