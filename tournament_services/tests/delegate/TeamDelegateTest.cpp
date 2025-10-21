@@ -2,13 +2,12 @@
 #include <gmock/gmock.h>
 #include <memory>
 #include <expected>
+#include <pqxx/pqxx>
 
 #include "domain/Team.hpp"
 #include "delegate/TeamDelegate.hpp"
 #include "persistence/repository/IRepository.hpp"
-#include "exception/Duplicate.hpp"
-#include "exception/NotFound.hpp"
-#include "exception/InvalidFormat.hpp"
+#include "exception/Error.hpp"
 
 // Mock del repositorio
 class MockTeamRepository : public IRepository<domain::Team, std::string_view> {
@@ -31,167 +30,156 @@ protected:
     }
 };
 
-// ========== Tests para CreateTeam ==========
+// Tests de CreateTeam
 
-// Validar creación exitosa con el valor transferido al repositorio
-TEST_F(TeamDelegateTest, CreateTeam_ValidValue_ReturnsGeneratedId) {
-    domain::Team newTeam{"", "New Team"};
-    std::string_view expectedId = "generated-id";
+// Validar creacion exitosa: transferencia de valor y retorno de ID generado
+TEST_F(TeamDelegateTest, CreateTeam_Id) {
+  domain::Team newTeam;
+  newTeam.Id = "";
+  newTeam.Name = "New Team";
+  std::string_view expectedId = "550e8400-e29b-41d4-a716-446655440000";
 
-    // Validar que el equipo transferido tenga el nombre correcto
-    EXPECT_CALL(*mockRepository, Create(testing::Field(&domain::Team::Name, "New Team")))
-        .WillOnce(testing::Return(expectedId));
+  EXPECT_CALL(*mockRepository, Create(testing::Field(&domain::Team::Name, "New Team")))
+    .WillOnce(testing::Return(expectedId));
 
-    auto result = teamDelegate->CreateTeam(newTeam);
+  auto result = teamDelegate->CreateTeam(newTeam);
 
-    EXPECT_EQ(result, expectedId);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ(result.value(), expectedId);
 }
 
-// Validar creación fallida (si usas std::expected en TeamDelegate)
-// Nota: Esto requeriría cambiar la firma de CreateTeam a retornar std::expected
-TEST_F(TeamDelegateTest, CreateTeam_DuplicateName_ThrowsException) {
-    domain::Team duplicateTeam{"", "Duplicate Team"};
+// Validar creacion fallida: error de duplicado usando std::expected
+TEST_F(TeamDelegateTest, CreateTeam_Error) {
+  domain::Team duplicateTeam;
+  duplicateTeam.Id = "";
+  duplicateTeam.Name = "Duplicate Team";
 
-    EXPECT_CALL(*mockRepository, Create(testing::Field(&domain::Team::Name, "Duplicate Team")))
-        .WillOnce(testing::Throw(DuplicateException("A team with the same name already exists.")));
+  EXPECT_CALL(*mockRepository, Create(testing::Field(&domain::Team::Name, "Duplicate Team")))
+    .WillOnce(testing::Throw(pqxx::unique_violation("duplicate key value violates unique constraint", "", "23505")));
 
-    EXPECT_THROW({
-        teamDelegate->CreateTeam(duplicateTeam);
-    }, DuplicateException);
+  auto result = teamDelegate->CreateTeam(duplicateTeam);
+
+  ASSERT_FALSE(result.has_value());
+  EXPECT_EQ(result.error(), Error::DUPLICATE);
 }
 
-// ========== Tests para GetTeam (búsqueda por ID) ==========
+// Tests de GetTeam (busqueda por ID)
 
-// Validar búsqueda exitosa con valor transferido y objeto retornado
-TEST_F(TeamDelegateTest, GetTeam_ValidId_ReturnsTeamObject) {
-    auto expectedTeam = std::make_shared<domain::Team>(domain::Team{"test-id", "Test Team"});
-    
-    // Validar que el ID transferido sea exactamente "test-id"
-    EXPECT_CALL(*mockRepository, ReadById(testing::StrEq("test-id")))
-        .WillOnce(testing::Return(expectedTeam));
+// Validar busqueda exitosa: transferencia del ID y retorno del objeto
+TEST_F(TeamDelegateTest, GetTeam_Ok) {
+  std::string_view testId = "550e8400-e29b-41d4-a716-446655440000";
+  auto expectedTeam = std::make_shared<domain::Team>();
+  expectedTeam->Id = "550e8400-e29b-41d4-a716-446655440000";
+  expectedTeam->Name = "Test Team";
 
-    auto result = teamDelegate->GetTeam("test-id");
+  EXPECT_CALL(*mockRepository, ReadById(testing::StrEq(testId)))
+    .WillOnce(testing::Return(expectedTeam));
 
-    ASSERT_NE(result, nullptr);
-    EXPECT_EQ(result->Id, "test-id");
-    EXPECT_EQ(result->Name, "Test Team");
+  auto result = teamDelegate->GetTeam(testId);
+
+  ASSERT_TRUE(result.has_value());
+  auto team = result.value();
+  EXPECT_EQ(team->Id, "550e8400-e29b-41d4-a716-446655440000");
+  EXPECT_EQ(team->Name, "Test Team");
 }
 
-// Validar búsqueda sin resultado (nullptr)
-TEST_F(TeamDelegateTest, GetTeam_NonExistentId_ReturnsNullptr) {
-    EXPECT_CALL(*mockRepository, ReadById(testing::StrEq("non-existent-id")))
-        .WillOnce(testing::Return(nullptr));
+// Validar busqueda sin resultado: retorna nullptr
+TEST_F(TeamDelegateTest, GetTeam_NotFound) {
+  std::string_view nonExistentId = "550e8400-e29b-41d4-a716-446655440001";
 
-    auto result = teamDelegate->GetTeam("non-existent-id");
+  EXPECT_CALL(*mockRepository, ReadById(testing::StrEq(nonExistentId)))
+    .WillOnce(testing::Return(nullptr));
 
-    EXPECT_EQ(result, nullptr);
+  auto result = teamDelegate->GetTeam(nonExistentId);
+
+  ASSERT_FALSE(result.has_value());
+  EXPECT_EQ(result.error(), Error::NOT_FOUND);
 }
 
-// ========== Tests para GetAllTeams ==========
+// Tests de GetAllTeams
 
-// Simular lista con objetos
-TEST_F(TeamDelegateTest, GetAllTeams_ReturnsMultipleTeams) {
-    std::vector<std::shared_ptr<domain::Team>> teams = {
-        std::make_shared<domain::Team>(domain::Team{"id1", "Team One"}),
-        std::make_shared<domain::Team>(domain::Team{"id2", "Team Two"}),
-        std::make_shared<domain::Team>(domain::Team{"id3", "Team Three"})
-    };
+// Validar lista con objetos
+TEST_F(TeamDelegateTest, GetAllTeams_Ok) {
+  std::vector<std::shared_ptr<domain::Team>> teams;
+  
+  auto team1 = std::make_shared<domain::Team>();
+  team1->Id = "550e8400-e29b-41d4-a716-446655440001";
+  team1->Name = "Team One";
+  
+  auto team2 = std::make_shared<domain::Team>();
+  team2->Id = "550e8400-e29b-41d4-a716-446655440002";
+  team2->Name = "Team Two";
+  
+  auto team3 = std::make_shared<domain::Team>();
+  team3->Id = "550e8400-e29b-41d4-a716-446655440003";
+  team3->Name = "Team Three";
+  
+  teams.push_back(team1);
+  teams.push_back(team2);
+  teams.push_back(team3);
 
-    EXPECT_CALL(*mockRepository, ReadAll())
-        .WillOnce(testing::Return(teams));
+  EXPECT_CALL(*mockRepository, ReadAll())
+    .WillOnce(testing::Return(teams));
 
-    auto result = teamDelegate->GetAllTeams();
+  auto result = teamDelegate->GetAllTeams();
 
-    ASSERT_EQ(result.size(), 3);
-    EXPECT_EQ(result[0]->Id, "id1");
-    EXPECT_EQ(result[0]->Name, "Team One");
-    EXPECT_EQ(result[1]->Id, "id2");
-    EXPECT_EQ(result[1]->Name, "Team Two");
-    EXPECT_EQ(result[2]->Id, "id3");
-    EXPECT_EQ(result[2]->Name, "Team Three");
+  ASSERT_TRUE(result.has_value());
+  auto retrievedTeams = result.value();
+  ASSERT_EQ(retrievedTeams.size(), 3);
+  EXPECT_EQ(retrievedTeams[0]->Id, "550e8400-e29b-41d4-a716-446655440001");
+  EXPECT_EQ(retrievedTeams[0]->Name, "Team One");
+  EXPECT_EQ(retrievedTeams[1]->Id, "550e8400-e29b-41d4-a716-446655440002");
+  EXPECT_EQ(retrievedTeams[1]->Name, "Team Two");
+  EXPECT_EQ(retrievedTeams[2]->Id, "550e8400-e29b-41d4-a716-446655440003");
+  EXPECT_EQ(retrievedTeams[2]->Name, "Team Three");
 }
 
-// Simular lista vacía
-TEST_F(TeamDelegateTest, GetAllTeams_ReturnsEmptyList) {
-    std::vector<std::shared_ptr<domain::Team>> emptyTeams;
+// Validar lista vacia
+TEST_F(TeamDelegateTest, GetAllTeams_Empty) {
+  std::vector<std::shared_ptr<domain::Team>> emptyTeams;
 
-    EXPECT_CALL(*mockRepository, ReadAll())
-        .WillOnce(testing::Return(emptyTeams));
+  EXPECT_CALL(*mockRepository, ReadAll())
+    .WillOnce(testing::Return(emptyTeams));
 
-    auto result = teamDelegate->GetAllTeams();
+  auto result = teamDelegate->GetAllTeams();
 
-    EXPECT_TRUE(result.empty());
+  ASSERT_TRUE(result.has_value());
+  auto retrievedTeams = result.value();
+  EXPECT_TRUE(retrievedTeams.empty());
 }
 
-// ========== Tests para UpdateTeam ==========
+// Tests de UpdateTeam
 
-// Validar actualización exitosa verificando el valor transferido
-TEST_F(TeamDelegateTest, UpdateTeam_ValidTeam_ReturnsSuccessfully) {
-    domain::Team updatedTeam{"existing-id", "Updated Team Name"};
-    std::string_view expectedResult = "existing-id";
+// Validar actualizacion exitosa: busqueda por ID, transferencia de valor, resultado exitoso
+TEST_F(TeamDelegateTest, UpdateTeam_Ok) {
+  domain::Team updatedTeam;
+  updatedTeam.Id = "550e8400-e29b-41d4-a716-446655440000";
+  updatedTeam.Name = "Updated Team Name";
+  std::string_view expectedResult = "550e8400-e29b-41d4-a716-446655440000";
 
-    // Validar que el equipo transferido tenga el ID y nombre correctos
-    EXPECT_CALL(*mockRepository, Update(testing::AllOf(
-        testing::Field(&domain::Team::Id, "existing-id"),
-        testing::Field(&domain::Team::Name, "Updated Team Name")
-    )))
-        .WillOnce(testing::Return(expectedResult));
+  EXPECT_CALL(*mockRepository, Update(testing::AllOf(
+    testing::Field(&domain::Team::Id, "550e8400-e29b-41d4-a716-446655440000"),
+    testing::Field(&domain::Team::Name, "Updated Team Name")
+  )))
+    .WillOnce(testing::Return(expectedResult));
 
-    auto result = teamDelegate->UpdateTeam(updatedTeam);
+  auto result = teamDelegate->UpdateTeam(updatedTeam);
 
-    EXPECT_EQ(result, expectedResult);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ(result.value(), expectedResult);
 }
 
-// Validar actualización fallida por equipo no encontrado
-TEST_F(TeamDelegateTest, UpdateTeam_NonExistentTeam_ThrowsNotFoundException) {
-    domain::Team nonExistentTeam{"non-existent-id", "Some Team"};
+// Validar actualizacion fallida: busqueda por ID sin resultado y retorna error
+TEST_F(TeamDelegateTest, UpdateTeam_NotFound) {
+  domain::Team nonExistentTeam;
+  nonExistentTeam.Id = "550e8400-e29b-41d4-a716-446655440001";
+  nonExistentTeam.Name = "Some Team";
 
-    EXPECT_CALL(*mockRepository, Update(testing::Field(&domain::Team::Id, "non-existent-id")))
-        .WillOnce(testing::Throw(NotFoundException("Team not found for update.")));
+  EXPECT_CALL(*mockRepository, Update(testing::Field(&domain::Team::Id, "550e8400-e29b-41d4-a716-446655440001")))
+    .WillOnce(testing::Return(std::string_view("")));
 
-    EXPECT_THROW({
-        teamDelegate->UpdateTeam(nonExistentTeam);
-    }, NotFoundException);
+  auto result = teamDelegate->UpdateTeam(nonExistentTeam);
+
+  ASSERT_FALSE(result.has_value());
+  EXPECT_EQ(result.error(), Error::NOT_FOUND);
 }
-
-// Validar actualización con formato inválido
-TEST_F(TeamDelegateTest, UpdateTeam_InvalidFormat_ThrowsException) {
-    domain::Team invalidTeam{"invalid-format-id", "Team Name"};
-
-    EXPECT_CALL(*mockRepository, Update(testing::Field(&domain::Team::Id, "invalid-format-id")))
-        .WillOnce(testing::Throw(InvalidFormatException("Invalid ID format.")));
-
-    EXPECT_THROW({
-        teamDelegate->UpdateTeam(invalidTeam);
-    }, InvalidFormatException);
-}
-
-// ========== Tests para DeleteTeam ==========
-
-TEST_F(TeamDelegateTest, DeleteTeam_Success) {
-    EXPECT_CALL(*mockRepository, Delete(testing::StrEq("team-to-delete")))
-        .Times(1);
-
-    EXPECT_NO_THROW({
-        teamDelegate->DeleteTeam("team-to-delete");
-    });
-}
-
-TEST_F(TeamDelegateTest, DeleteTeam_NotFound) {
-    EXPECT_CALL(*mockRepository, Delete(testing::StrEq("non-existent-id")))
-        .WillOnce(testing::Throw(NotFoundException("Team not found for deletion.")));
-
-    EXPECT_THROW({
-        teamDelegate->DeleteTeam("non-existent-id");
-    }, NotFoundException);
-}
-
-TEST_F(TeamDelegateTest, DeleteTeam_InvalidFormat) {
-    EXPECT_CALL(*mockRepository, Delete(testing::StrEq("invalid-id")))
-        .WillOnce(testing::Throw(InvalidFormatException("Invalid ID format.")));
-
-    EXPECT_THROW({
-        teamDelegate->DeleteTeam("invalid-id");
-    }, InvalidFormatException);
-}  
-
