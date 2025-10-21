@@ -8,7 +8,7 @@ static constexpr std::size_t kMaxTeamsPerGroup = 16;
 GroupDelegate::GroupDelegate(
     const std::shared_ptr<IRepository<domain::Tournament, std::string>>& tRepo,
     const std::shared_ptr<IGroupRepository>& gRepo,
-    const std::shared_ptr<IRepository<domain::Team, std::string>>& teamRepo, // <- std::string
+    const std::shared_ptr<IRepository<domain::Team, std::string_view>>& teamRepo, // <- std::string
     const std::shared_ptr<IQueueMessageProducer>& producer)
     : tournamentRepository(tRepo)
     , groupRepository(gRepo)

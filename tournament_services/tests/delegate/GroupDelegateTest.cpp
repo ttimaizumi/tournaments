@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 #include <expected>
-
+#include <string_view>
 #include "delegate/GroupDelegate.hpp"
 #include "persistence/repository/IRepository.hpp"
 #include "persistence/repository/IGroupRepository.hpp"
@@ -49,12 +49,12 @@ struct MockGroupRepo : IGroupRepository {
 };
 
 // Team repo mock (IRepository<domain::Team, std::string>)
-struct MockTeamRepo : IRepository<domain::Team, std::string> {
-    MOCK_METHOD(std::shared_ptr<domain::Team>, ReadById, (std::string id), (override));
+struct MockTeamRepo : IRepository<domain::Team, std::string_view> {
+    MOCK_METHOD(std::shared_ptr<domain::Team>, ReadById, (std::string_view id), (override));
     MOCK_METHOD(std::vector<std::shared_ptr<domain::Team>>, ReadAll, (), (override));
-    MOCK_METHOD(std::string, Create, (const domain::Team&), (override));
-    MOCK_METHOD(std::string, Update, (const domain::Team&), (override));
-    MOCK_METHOD(void, Delete, (std::string id), (override));
+    MOCK_METHOD(std::string_view, Create, (const domain::Team&), (override));
+    MOCK_METHOD(std::string_view, Update, (const domain::Team&), (override));
+    MOCK_METHOD(void, Delete, (std::string_view id), (override));
 };
 
 struct MockProducer : IQueueMessageProducer {
