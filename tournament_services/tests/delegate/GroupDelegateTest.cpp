@@ -126,7 +126,7 @@ TEST_F(GroupDelegateTest, CreateGroup_MaxTeams) {
     domain::Group group{"Test Group", "test-group"};
     for (int i = 0; i < 32; ++i) {
         domain::Team team;
-        team.Id = "team-" + std::to_string(i);
+        team.Id = std::to_string(i+10) + "8e179c-a21d-4c8c-afb6-25f8f6126acf";
         team.Name = "Team " + std::to_string(i);
         group.Teams().push_back(team);
     }
@@ -143,7 +143,7 @@ TEST_F(GroupDelegateTest, CreateGroup_MaxTeams) {
     auto result = groupDelegate->CreateGroup(validTournamentId, group);
 
     ASSERT_FALSE(result.has_value());
-    EXPECT_EQ(result.error(), Error::INVALID_FORMAT); 
+    EXPECT_EQ(result.error(), Error::UNPROCESSABLE_ENTITY);
 }
 
 // Tests de GetGroup
