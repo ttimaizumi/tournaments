@@ -23,7 +23,7 @@ static int mapErrorToStatus(const Error err) {
     case Error::NOT_FOUND: return crow::NOT_FOUND;
     case Error::INVALID_FORMAT: return crow::BAD_REQUEST;
     case Error::DUPLICATE: return crow::CONFLICT;
-    case Error::UNPROCESSABLE_ENTITY: return 422;
+    case Error::UNPROCESSABLE_ENTITY: return crow::NOT_ACCEPTABLE;
     default: return crow::INTERNAL_SERVER_ERROR;
   }
 }
