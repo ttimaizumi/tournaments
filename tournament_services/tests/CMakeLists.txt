@@ -1,7 +1,4 @@
 project(tournament_tests)
-find_package(GTest CONFIG REQUIRED)
-include(GoogleTest)
-
 set(TEST_COMMON_LIBS
         GTest::gtest
         GTest::gtest_main
@@ -12,20 +9,26 @@ set(TEST_COMMON_LIBS
 
 include_directories(../include)
 
-add_executable(test_runner
-        controller/GroupControllerTest.cpp
-        controller/TeamControllerTest.cpp
-        controller/TournamentControllerTest.cpp
-        delegate/GroupDelegateTest.cpp
-        delegate/TeamDelegateTest.cpp
-        delegate/TournamentDelegateTest.cpp
-        ../src/controller/GroupController.cpp
-        ../src/controller/TeamController.cpp
-        ../src/controller/TournamentController.cpp
-        ../src/delegate/GroupDelegate.cpp
-        ../src/delegate/TeamDelegate.cpp
-        ../src/delegate/TournamentDelegate.cpp
-)
+find_package(GTest CONFIG REQUIRED)
+include(GoogleTest)
 
-target_link_libraries(test_runner PRIVATE ${TEST_COMMON_LIBS})
-gtest_discover_tests(test_runner)
+# Macro to create one test target per file
+function(add_tournament_test name)
+    add_executable(${name}_runner
+            ${ARGN}
+            ../src/controller/TeamController.cpp
+            ../src/controller/TournamentController.cpp
+            ../src/delegate/TeamDelegate.cpp
+            ../src/delegate/TournamentDelegate.cpp
+    )
+    target_link_libraries(${name}_runner PRIVATE ${TEST_COMMON_LIBS})
+    gtest_discover_tests(${name}_runner)
+endfunction()
+
+# Individual test files
+add_tournament_test(group_controller_test controller/GroupControllerTest.cpp)
+add_tournament_test(team_controller_test controller/TeamControllerTest.cpp)
+add_tournament_test(tournament_controller_test controller/TournamentControllerTest.cpp)
+add_tournament_test(group_delegate_test delegate/GroupDelegateTest.cpp)
+add_tournament_test(team_delegate_test delegate/TeamDelegateTest.cpp)
+add_tournament_test(tournament_delegate_test delegate/TournamentDelegateTest.cpp)

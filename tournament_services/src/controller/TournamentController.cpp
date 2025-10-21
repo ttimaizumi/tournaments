@@ -27,15 +27,15 @@ crow::response TournamentController::CreateTournament(const crow::request &reque
     nlohmann::json body = nlohmann::json::parse(request.body);
     const std::shared_ptr<domain::Tournament> tournament = std::make_shared<domain::Tournament>(body);
 
-    auto idResult = tournamentDelegate->CreateTournament(tournament);
+    const std::string id = tournamentDelegate->CreateTournament(tournament);
 
-    if(!idResult.has_value()) {
+    if(id.empty()) {
         response.code = crow::CONFLICT;
         return response;
     }
 
     response.code = crow::CREATED;
-    response.add_header("location", idResult.value());
+    response.add_header("location", id);
     return response;
 }
 
@@ -76,9 +76,9 @@ crow::response TournamentController::UpdateTournament(const crow::request& reque
     domain::Tournament tournament = body;
     tournament.Id() = tournamentId;
 
-    auto updatedIdResult = tournamentDelegate->UpdateTournament(tournament);
+    std::string updatedId(tournamentDelegate->UpdateTournament(tournament));
 
-    if(!updatedIdResult.has_value()) {
+    if(updatedId.empty()) {
         return crow::response{crow::NOT_FOUND};
     }
 

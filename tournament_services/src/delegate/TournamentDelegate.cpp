@@ -11,27 +11,24 @@
 TournamentDelegate::TournamentDelegate(std::shared_ptr<IRepository<domain::Tournament, std::string> > repository, std::shared_ptr<QueueMessageProducer> producer) : tournamentRepository(std::move(repository)), producer(std::move(producer)) {
 }
 
-std::expected<std::string, std::string> TournamentDelegate::CreateTournament(std::shared_ptr<domain::Tournament> tournament) {
-    try {
-        // std::shared_ptr<domain::Tournament> tp = std::move(tournament);
-        // for (auto[i, g] = std::tuple{0, 'A'}; i < tp->Format().NumberOfGroups(); i++,g++) {
-        //     tp->Groups().push_back(domain::Group{std::format("Tournament {}", g)});
-        // }
-
-        std::string id = tournamentRepository->Create(*tournament);
-
-        if(id.empty()) {
-            return std::unexpected("Tournament already exists");
-        }
-
-        producer->SendMessage(id, "tournament.created");
-
-        // if groups are completed also create matches
-
-        return id;
-    } catch(const std::exception& e) {
-        return std::unexpected(std::string("Failed to create tournament: ") + e.what());
+std::string TournamentDelegate::CreateTournament(std::shared_ptr<domain::Tournament> tournament) {
+    auto tournamentRepo = dynamic_cast<TournamentRepository*>(tournamentRepository.get());
+    if(tournamentRepo && tournamentRepo->ExistsByName(tournament->Name())) {
+        return "";
     }
+
+    // std::shared_ptr<domain::Tournament> tp = std::move(tournament);
+    // for (auto[i, g] = std::tuple{0, 'A'}; i < tp->Format().NumberOfGroups(); i++,g++) {
+    //     tp->Groups().push_back(domain::Group{std::format("Tournament {}", g)});
+    // }
+
+    std::string id = tournamentRepository->Create(*tournament);
+
+    producer->SendMessage(id, "tournament.created");
+
+    // if groups are completed also create matches
+
+    return id;
 }
 
 std::vector<std::shared_ptr<domain::Tournament> > TournamentDelegate::ReadAll() {
@@ -42,14 +39,11 @@ std::shared_ptr<domain::Tournament> TournamentDelegate::ReadById(const std::stri
     return tournamentRepository->ReadById(id);
 }
 
-std::expected<std::string, std::string> TournamentDelegate::UpdateTournament(const domain::Tournament& tournament){
-    try {
-        std::string id = tournamentRepository->Update(tournament);
-        if(id.empty()) {
-            return std::unexpected("Tournament not found");
-        }
-        return id;
-    } catch(const std::exception& e) {
-        return std::unexpected(std::string("Failed to update tournament: ") + e.what());
+std::string TournamentDelegate::UpdateTournament(const domain::Tournament& tournament){
+    auto tournamentRepo = dynamic_cast<TournamentRepository*>(tournamentRepository.get());
+    if(tournamentRepo && !tournamentRepo->ExistsById(tournament.Id())) {
+        return "";
     }
+
+    return tournamentRepository->Update(tournament);
 }

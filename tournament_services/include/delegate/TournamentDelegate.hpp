@@ -6,7 +6,6 @@
 #define TOURNAMENTS_TOURNAMENTDELEGATE_HPP
 
 #include <string>
-#include <expected>
 
 #include "cms/QueueMessageProducer.hpp"
 #include "delegate/ITournamentDelegate.hpp"
@@ -18,10 +17,10 @@ class TournamentDelegate : public ITournamentDelegate{
 public:
     explicit TournamentDelegate(std::shared_ptr<IRepository<domain::Tournament, std::string>> repository, std::shared_ptr<QueueMessageProducer> producer);
 
-    std::expected<std::string, std::string> CreateTournament(std::shared_ptr<domain::Tournament> tournament) override;
+    std::string CreateTournament(std::shared_ptr<domain::Tournament> tournament) override;
     std::vector<std::shared_ptr<domain::Tournament>> ReadAll() override;
     std::shared_ptr<domain::Tournament> ReadById(const std::string& id) override;
-    std::expected<std::string, std::string> UpdateTournament(const domain::Tournament& tournament) override;
+    std::string UpdateTournament(const domain::Tournament& tournament) override;
 };
 
 #endif //TOURNAMENTS_TOURNAMENTDELEGATE_HPP
