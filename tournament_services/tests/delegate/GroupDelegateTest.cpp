@@ -124,7 +124,7 @@ TEST_F(GroupDelegateTest, CreateGroup_Error) {
 // Validar error cuando se alcanza numero maximo de equipos
 TEST_F(GroupDelegateTest, CreateGroup_MaxTeams) {
     domain::Group group{"Test Group", "test-group"};
-    for (int i = 0; i < 32; ++i) {
+    for (int i = 0; i <= 32; ++i) {
         domain::Team team;
         team.Id = std::to_string(i+10) + "8e179c-a21d-4c8c-afb6-25f8f6126acf";
         team.Name = "Team " + std::to_string(i);
