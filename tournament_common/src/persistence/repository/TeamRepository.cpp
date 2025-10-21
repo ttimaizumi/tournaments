@@ -36,6 +36,10 @@ std::shared_ptr<domain::Team> TeamRepository::ReadById(std::string_view id) {
   pqxx::work tx(*(connection->connection));
   const pqxx::result result = tx.exec(pqxx::prepped{"select_team_by_id"}, pqxx::params{id});
   tx.commit();
+  if (result.empty()) {
+    return nullptr;
+  }
+
   nlohmann::json rowTeam = nlohmann::json::parse(result.at(0)["document"].c_str());
   auto team = std::make_shared<domain::Team>(rowTeam);
   team->Id = result.at(0)["id"].c_str();
