@@ -32,12 +32,16 @@ GroupDelegate::CreateGroup(const std::string_view& tournamentId, const domain::G
             return std::unexpected("Team doesn't exist");
     }
 
-    auto id = groupRepository->Create(g);
+    try {
+        auto id = groupRepository->Create(g);
 
-    for (const auto& team : g.Teams())
-        producer->SendMessage(std::format("{}:{}:{}", tournamentId, id, team.Id), "team.added.to.group");
+        for (const auto& team : g.Teams())
+            producer->SendMessage(std::format("{}:{}:{}", tournamentId, id, team.Id), "team.added.to.group");
 
-    return id;
+        return id;
+    } catch (const std::exception& e) {
+        return std::unexpected(std::string(e.what()));
+    }
 }
 
 std::expected<std::vector<std::shared_ptr<domain::Group>>, std::string>

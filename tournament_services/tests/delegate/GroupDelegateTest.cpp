@@ -221,6 +221,10 @@ TEST_F(GroupDelegateTest, UpdateTeams_Success) {
         .WillOnce(testing::Return(tournament));
     EXPECT_CALL(*groupRepositoryMock, FindByTournamentIdAndGroupId("tournament-1", "group-1"))
         .WillOnce(testing::Return(group));
+    EXPECT_CALL(*groupRepositoryMock, FindByTournamentIdAndTeamId("tournament-1", "team-1"))
+        .WillOnce(testing::Return(nullptr));
+    EXPECT_CALL(*groupRepositoryMock, FindByTournamentIdAndTeamId("tournament-1", "team-2"))
+        .WillOnce(testing::Return(nullptr));
     EXPECT_CALL(*teamRepositoryMock, ReadById("team-1")).WillOnce(testing::Return(team1));
     EXPECT_CALL(*teamRepositoryMock, ReadById("team-2")).WillOnce(testing::Return(team2));
 
@@ -248,6 +252,8 @@ TEST_F(GroupDelegateTest, UpdateTeams_TeamNotFound_ReturnsError) {
         .WillOnce(testing::Return(tournament));
     EXPECT_CALL(*groupRepositoryMock, FindByTournamentIdAndGroupId("tournament-1", "group-1"))
         .WillOnce(testing::Return(group));
+    EXPECT_CALL(*groupRepositoryMock, FindByTournamentIdAndTeamId("tournament-1", "team-1"))
+        .WillOnce(testing::Return(nullptr));
     EXPECT_CALL(*teamRepositoryMock, ReadById("team-1")).WillOnce(testing::Return(nullptr));
 
     std::vector<domain::Team> teams = {domain::Team("team-1", "Team A")};

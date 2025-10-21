@@ -9,10 +9,10 @@
 
 class TournamentDelegateMock : public ITournamentDelegate {
 public:
-    MOCK_METHOD(std::string, CreateTournament, (std::shared_ptr<domain::Tournament>), (override));
-    MOCK_METHOD(std::vector<std::shared_ptr<domain::Tournament>>, ReadAll, (), (override));
-    MOCK_METHOD(std::shared_ptr<domain::Tournament>, ReadById, (const std::string&), (override));
-    MOCK_METHOD(std::string, UpdateTournament, (const domain::Tournament&), (override));
+    MOCK_METHOD((std::expected<std::string, std::string>), CreateTournament, (std::shared_ptr<domain::Tournament>), (override));
+    MOCK_METHOD((std::expected<std::vector<std::shared_ptr<domain::Tournament>>, std::string>), ReadAll, (), (override));
+    MOCK_METHOD((std::expected<std::shared_ptr<domain::Tournament>, std::string>), ReadById, (const std::string&), (override));
+    MOCK_METHOD((std::expected<std::string, std::string>), UpdateTournament, (const domain::Tournament&), (override));
 };
 
 class TournamentControllerTest : public ::testing::Test {
@@ -35,7 +35,7 @@ TEST_F(TournamentControllerTest, CreateTournament_ValidInput_Returns201WithLocat
     const std::string expectedId = "new-tournament-id-123";
 
     EXPECT_CALL(*tournamentDelegateMock, CreateTournament(testing::_))
-            .WillOnce(testing::Return(expectedId));
+            .WillOnce(testing::Return(std::expected<std::string, std::string>(expectedId)));
 
     nlohmann::json tournamentBody = {
             {"name", "Mundial 2025"},
@@ -57,7 +57,7 @@ TEST_F(TournamentControllerTest, CreateTournament_ValidInput_Returns201WithLocat
 // Test 2: Crear torneo duplicado - retorna HTTP 409 Conflict
 TEST_F(TournamentControllerTest, CreateTournament_DuplicateName_Returns409Conflict) {
     EXPECT_CALL(*tournamentDelegateMock, CreateTournament(testing::_))
-            .WillOnce(testing::Return("")); // String vacío indica conflicto
+            .WillOnce(testing::Return(std::unexpected<std::string>("Tournament already exists")));
 
     nlohmann::json tournamentBody = {
             {"name", "Existing Tournament"},
@@ -82,7 +82,7 @@ TEST_F(TournamentControllerTest, CreateTournament_TransformsJsonCorrectly) {
     EXPECT_CALL(*tournamentDelegateMock, CreateTournament(testing::_))
             .WillOnce(testing::DoAll(
                     testing::SaveArg<0>(&capturedTournament),
-                    testing::Return("new-id")
+                    testing::Return(std::expected<std::string, std::string>("new-id"))
             ));
 
     nlohmann::json tournamentBody = {
@@ -141,7 +141,7 @@ TEST_F(TournamentControllerTest, GetTournamentById_ValidId_Returns200WithTournam
     expectedTournament->Id() = "tournament-id-456";
 
     EXPECT_CALL(*tournamentDelegateMock, ReadById(testing::Eq(std::string("tournament-id-456"))))
-            .WillOnce(testing::Return(expectedTournament));
+            .WillOnce(testing::Return(std::expected<std::shared_ptr<domain::Tournament>, std::string>(expectedTournament)));
 
     crow::response response = tournamentController->GetTournament("tournament-id-456");
     auto jsonResponse = nlohmann::json::parse(response.body);
@@ -155,7 +155,7 @@ TEST_F(TournamentControllerTest, GetTournamentById_ValidId_Returns200WithTournam
 // Test 8: Buscar torneo por ID - torneo no encontrado retorna HTTP 404
 TEST_F(TournamentControllerTest, GetTournamentById_NotFound_Returns404) {
     EXPECT_CALL(*tournamentDelegateMock, ReadById(testing::Eq(std::string("non-existent-id"))))
-            .WillOnce(testing::Return(nullptr));
+            .WillOnce(testing::Return(std::expected<std::shared_ptr<domain::Tournament>, std::string>(nullptr)));
 
     crow::response response = tournamentController->GetTournament("non-existent-id");
 
@@ -171,7 +171,7 @@ TEST_F(TournamentControllerTest, GetTournamentById_TransfersCorrectIdToDelegate)
     EXPECT_CALL(*tournamentDelegateMock, ReadById(testing::_))
             .WillOnce(testing::DoAll(
                     testing::SaveArg<0>(&capturedId),
-                    testing::Return(mockTournament)
+                    testing::Return(std::expected<std::shared_ptr<domain::Tournament>, std::string>(mockTournament))
             ));
 
     tournamentController->GetTournament("specific-id-789");
@@ -191,7 +191,7 @@ TEST_F(TournamentControllerTest, GetAllTournaments_WithTournaments_Returns200Wit
     tournaments[2]->Id() = "id-3";
 
     EXPECT_CALL(*tournamentDelegateMock, ReadAll())
-            .WillOnce(testing::Return(tournaments));
+            .WillOnce(testing::Return(std::expected<std::vector<std::shared_ptr<domain::Tournament>>, std::string>(tournaments)));
 
     crow::response response = tournamentController->ReadAll();
     auto jsonResponse = nlohmann::json::parse(response.body);
@@ -206,7 +206,7 @@ TEST_F(TournamentControllerTest, GetAllTournaments_EmptyList_Returns200WithEmpty
     std::vector<std::shared_ptr<domain::Tournament>> emptyTournaments;
 
     EXPECT_CALL(*tournamentDelegateMock, ReadAll())
-            .WillOnce(testing::Return(emptyTournaments));
+            .WillOnce(testing::Return(std::expected<std::vector<std::shared_ptr<domain::Tournament>>, std::string>(emptyTournaments)));
 
     crow::response response = tournamentController->ReadAll();
     auto jsonResponse = nlohmann::json::parse(response.body);
@@ -225,7 +225,7 @@ TEST_F(TournamentControllerTest, UpdateTournament_ValidInput_Returns204NoContent
     EXPECT_CALL(*tournamentDelegateMock, UpdateTournament(testing::_))
             .WillOnce(testing::DoAll(
                     testing::SaveArg<0>(&capturedTournament),
-                    testing::Return(tournamentId)
+                    testing::Return(std::expected<std::string, std::string>(tournamentId))
             ));
 
     nlohmann::json tournamentBody = {{"name", "Mundial 2026 Updated"}};
@@ -247,7 +247,7 @@ TEST_F(TournamentControllerTest, UpdateTournament_TournamentNotFound_Returns404)
     EXPECT_CALL(*tournamentDelegateMock, UpdateTournament(testing::_))
             .WillOnce(testing::DoAll(
                     testing::SaveArg<0>(&capturedTournament),
-                    testing::Return("") // String vacío indica que no existe
+                    testing::Return(std::unexpected<std::string>("Tournament not found"))
             ));
 
     nlohmann::json tournamentBody = {{"name", "Updated Tournament"}};
@@ -269,7 +269,7 @@ TEST_F(TournamentControllerTest, UpdateTournament_TransformsJsonCorrectly) {
     EXPECT_CALL(*tournamentDelegateMock, UpdateTournament(testing::_))
             .WillOnce(testing::DoAll(
                     testing::SaveArg<0>(&capturedTournament),
-                    testing::Return(tournamentId)
+                    testing::Return(std::expected<std::string, std::string>(tournamentId))
             ));
 
     nlohmann::json tournamentBody = {
