@@ -66,7 +66,7 @@ TEST_F(TournamentControllerTest, CreateTournament_Conflict) {
 
 // Validar respuesta exitosa y contenido completo. Response 200
 TEST_F(TournamentControllerTest, GetTournamentById_Ok) {
-  std::string tournamentId = "tournament-123";
+  std::string tournamentId = "550e8400-e29b-41d4-a716-446655440000"; // UUID
   auto tournament = std::make_shared<domain::Tournament>("Test Tournament");
   tournament->Id() = tournamentId;
 
@@ -82,7 +82,7 @@ TEST_F(TournamentControllerTest, GetTournamentById_Ok) {
 
 // Validar respuesta NOT_FOUND. Response 404
 TEST_F(TournamentControllerTest, GetTournamentById_NotFound) {
-  std::string tournamentId = "non-existent-id";
+  std::string tournamentId = "550e8400-e29b-41d4-a716-446655440001";
 
   EXPECT_CALL(*tournamentDelegateMock, GetTournament(tournamentId))
       .WillOnce(testing::Return(std::expected<std::shared_ptr<domain::Tournament>, Error>(std::unexpected(Error::NOT_FOUND))));
@@ -165,7 +165,7 @@ TEST_F(TournamentControllerTest, UpdateTournament_NotFound) {
 // Tests de DeleteTournament
 
 TEST_F(TournamentControllerTest, DeleteTournament_NoContent) {
-  std::string tournamentId = "tournament-123";
+  std::string tournamentId = "550e8400-e29b-41d4-a716-446655440000";
 
   EXPECT_CALL(*tournamentDelegateMock, DeleteTournament(tournamentId))
       .WillOnce(testing::Return(std::expected<void, Error>()));
@@ -176,7 +176,7 @@ TEST_F(TournamentControllerTest, DeleteTournament_NoContent) {
 }
 
 TEST_F(TournamentControllerTest, DeleteTournament_NotFound) {
-  std::string tournamentId = "non-existent-id";
+  std::string tournamentId = "550e8400-e29b-41d4-a716-446655440001";
 
   EXPECT_CALL(*tournamentDelegateMock, DeleteTournament(tournamentId))
       .WillOnce(testing::Return(std::expected<void, Error>(std::unexpected(Error::NOT_FOUND))));
