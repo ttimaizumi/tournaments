@@ -71,12 +71,13 @@ TEST_F(TournamentDelegateTest, CreateTournament_ValidInsertion_ReturnsGeneratedI
 
     auto result = tournamentDelegate->CreateTournament(tournament);
 
-    EXPECT_EQ(expectedId, result);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(expectedId, result.value());
     EXPECT_EQ("Mundial 2025", capturedTournament.Name());
 }
 
-// Test 2: Crear torneo - inserción fallida retorna cadena vacía (error)
-TEST_F(TournamentDelegateTest, CreateTournament_FailedInsertion_ReturnsEmptyString) {
+// Test 2: Crear torneo - inserción fallida retorna std::unexpected
+TEST_F(TournamentDelegateTest, CreateTournament_FailedInsertion_ReturnsError) {
     auto tournament = std::make_shared<domain::Tournament>("Duplicate Tournament");
 
     EXPECT_CALL(*repositoryMock, Create(testing::_))
@@ -85,9 +86,10 @@ TEST_F(TournamentDelegateTest, CreateTournament_FailedInsertion_ReturnsEmptyStri
     EXPECT_CALL(*producerMock, SendMessage(testing::_, testing::_))
             .Times(0);
 
-    EXPECT_THROW({
-                     tournamentDelegate->CreateTournament(tournament);
-                 }, std::runtime_error);
+    auto result = tournamentDelegate->CreateTournament(tournament);
+
+    ASSERT_FALSE(result.has_value());
+    EXPECT_THAT(result.error(), testing::HasSubstr("Error creating tournament"));
 }
 
 // Test 3: Buscar por ID - validar transferencia de ID y retorno con objeto
@@ -106,9 +108,11 @@ TEST_F(TournamentDelegateTest, ReadById_ValidId_ReturnsObjectWithCorrectValues) 
     auto result = tournamentDelegate->ReadById(tournamentId);
 
     EXPECT_EQ(tournamentId, capturedId);
-    ASSERT_NE(nullptr, result);
-    EXPECT_EQ(tournamentId, result->Id());
-    EXPECT_EQ("Mundial 2025", result->Name());
+    ASSERT_TRUE(result.has_value());
+    auto tournament = result.value();
+    ASSERT_NE(nullptr, tournament);
+    EXPECT_EQ(tournamentId, tournament->Id());
+    EXPECT_EQ("Mundial 2025", tournament->Name());
 }
 
 // Test 4: Buscar por ID - validar transferencia de ID y resultado nulo
@@ -125,7 +129,8 @@ TEST_F(TournamentDelegateTest, ReadById_InvalidId_ReturnsNullptr) {
     auto result = tournamentDelegate->ReadById(invalidId);
 
     EXPECT_EQ(invalidId, capturedId);
-    EXPECT_EQ(nullptr, result);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(nullptr, result.value());
 }
 
 // Test 5: Buscar todos - resultado con lista de objetos
@@ -146,13 +151,15 @@ TEST_F(TournamentDelegateTest, ReadAll_WithTournaments_ReturnsListOfObjects) {
 
     auto result = tournamentDelegate->ReadAll();
 
-    ASSERT_EQ(3, result.size());
-    EXPECT_EQ("id-1", result[0]->Id());
-    EXPECT_EQ("Mundial 2025", result[0]->Name());
-    EXPECT_EQ("id-2", result[1]->Id());
-    EXPECT_EQ("Copa America", result[1]->Name());
-    EXPECT_EQ("id-3", result[2]->Id());
-    EXPECT_EQ("Eurocopa", result[2]->Name());
+    ASSERT_TRUE(result.has_value());
+    auto tournamentList = result.value();
+    ASSERT_EQ(3, tournamentList.size());
+    EXPECT_EQ("id-1", tournamentList[0]->Id());
+    EXPECT_EQ("Mundial 2025", tournamentList[0]->Name());
+    EXPECT_EQ("id-2", tournamentList[1]->Id());
+    EXPECT_EQ("Copa America", tournamentList[1]->Name());
+    EXPECT_EQ("id-3", tournamentList[2]->Id());
+    EXPECT_EQ("Eurocopa", tournamentList[2]->Name());
 }
 
 // Test 6: Buscar todos - resultado con lista vacía
@@ -164,8 +171,10 @@ TEST_F(TournamentDelegateTest, ReadAll_EmptyRepository_ReturnsEmptyList) {
 
     auto result = tournamentDelegate->ReadAll();
 
-    EXPECT_TRUE(result.empty());
-    EXPECT_EQ(0, result.size());
+    ASSERT_TRUE(result.has_value());
+    auto tournamentList = result.value();
+    EXPECT_TRUE(tournamentList.empty());
+    EXPECT_EQ(0, tournamentList.size());
 }
 
 // Test 7: Actualizar torneo - validar transferencia a Update y resultado exitoso
@@ -183,13 +192,14 @@ TEST_F(TournamentDelegateTest, UpdateTournament_ValidUpdate_ReturnsUpdatedId) {
 
     auto result = tournamentDelegate->UpdateTournament(tournament);
 
-    EXPECT_EQ(tournamentId, result);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(tournamentId, result.value());
     EXPECT_EQ(tournamentId, capturedTournament.Id());
     EXPECT_EQ("Updated Tournament Name", capturedTournament.Name());
 }
 
-// Test 8: Actualizar torneo - búsqueda no exitosa retorna cadena vacía (error)
-TEST_F(TournamentDelegateTest, UpdateTournament_NonExistentId_ReturnsEmptyString) {
+// Test 8: Actualizar torneo - búsqueda no exitosa retorna std::unexpected
+TEST_F(TournamentDelegateTest, UpdateTournament_NonExistentId_ReturnsError) {
     const std::string nonExistentId = "non-existent-uuid";
     domain::Tournament tournament("Some Tournament");
     tournament.Id() = nonExistentId;
@@ -197,7 +207,8 @@ TEST_F(TournamentDelegateTest, UpdateTournament_NonExistentId_ReturnsEmptyString
     EXPECT_CALL(*repositoryMock, Update(testing::_))
             .WillOnce(testing::Throw(std::runtime_error("Tournament not found")));
 
-    EXPECT_THROW({
-                     tournamentDelegate->UpdateTournament(tournament);
-                 }, std::runtime_error);
+    auto result = tournamentDelegate->UpdateTournament(tournament);
+
+    ASSERT_FALSE(result.has_value());
+    EXPECT_THAT(result.error(), testing::HasSubstr("Error updating tournament"));
 }

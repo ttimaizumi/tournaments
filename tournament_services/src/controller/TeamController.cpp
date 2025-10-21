@@ -16,19 +16,30 @@ crow::response TeamController::getTeam(const std::string& teamId) const {
         return crow::response{crow::BAD_REQUEST, "Invalid ID format"};
     }
 
-    if(auto team = teamDelegate->GetTeam(teamId); team != nullptr) {
-        nlohmann::json body = team;
-        auto response = crow::response{crow::OK, body.dump()};
-        response.add_header(CONTENT_TYPE_HEADER, JSON_CONTENT_TYPE);
-        return response;
+    auto result = teamDelegate->GetTeam(teamId);
+    if(!result.has_value()) {
+        return crow::response{crow::INTERNAL_SERVER_ERROR, result.error()};
     }
-    return crow::response{crow::NOT_FOUND, "team not found"};
+
+    auto team = result.value();
+    if(team == nullptr) {
+        return crow::response{crow::NOT_FOUND, "team not found"};
+    }
+
+    nlohmann::json body = team;
+    auto response = crow::response{crow::OK, body.dump()};
+    response.add_header(CONTENT_TYPE_HEADER, JSON_CONTENT_TYPE);
+    return response;
 }
 
 crow::response TeamController::getAllTeams() const {
+    auto result = teamDelegate->GetAllTeams();
+    if(!result.has_value()) {
+        return crow::response{crow::INTERNAL_SERVER_ERROR, result.error()};
+    }
 
-    nlohmann::json body = teamDelegate->GetAllTeams();
-    crow::response response{200, body.dump()};
+    nlohmann::json body = result.value();
+    crow::response response{crow::OK, body.dump()};
     response.add_header(CONTENT_TYPE_HEADER, JSON_CONTENT_TYPE);
     return response;
 }
@@ -43,15 +54,21 @@ crow::response TeamController::SaveTeam(const crow::request& request) const {
     auto requestBody = nlohmann::json::parse(request.body);
     domain::Team team = requestBody;
 
-    auto createdId = teamDelegate->SaveTeam(team);
+    auto result = teamDelegate->SaveTeam(team);
 
-    if(createdId.empty()) {
-        response.code = crow::CONFLICT;
+    if(!result.has_value()) {
+        const std::string& error = result.error();
+        if(error.find("already exists") != std::string::npos) {
+            response.code = crow::CONFLICT;
+        } else {
+            response.code = crow::INTERNAL_SERVER_ERROR;
+            response.body = error;
+        }
         return response;
     }
 
     response.code = crow::CREATED;
-    response.add_header("location", createdId.data());
+    response.add_header("location", result.value());
 
     return response;
 }
@@ -69,10 +86,15 @@ crow::response TeamController::UpdateTeam(const crow::request& request, const st
     domain::Team team = body;
     team.Id = teamId;
 
-    std::string updatedId(teamDelegate->UpdateTeam(team));
+    auto result = teamDelegate->UpdateTeam(team);
 
-    if(updatedId.empty()) {
-        return crow::response{crow::NOT_FOUND};
+    if(!result.has_value()) {
+        const std::string& error = result.error();
+        if(error.find("not found") != std::string::npos) {
+            return crow::response{crow::NOT_FOUND};
+        } else {
+            return crow::response{crow::INTERNAL_SERVER_ERROR, error};
+        }
     }
 
     return crow::response{crow::NO_CONTENT};

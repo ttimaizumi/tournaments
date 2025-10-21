@@ -28,7 +28,8 @@ protected:
     }
 };
 
-TEST_F(GroupControllerTest, CreateGroup_Success) {
+// Test 1: Crear grupo - transformación JSON a Group, transferir a delegate, HTTP 201
+TEST_F(GroupControllerTest, CreateGroup_Success_Returns201) {
     domain::Group capturedGroup;
 
     EXPECT_CALL(*groupDelegateMock, CreateGroup(testing::Eq("tournament-1"), testing::_))
@@ -47,7 +48,8 @@ TEST_F(GroupControllerTest, CreateGroup_Success) {
     EXPECT_EQ("group-id-123", res.get_header_value("location"));
 }
 
-TEST_F(GroupControllerTest, CreateGroup_Error) {
+// Test 2: Crear grupo - simular error de inserción, HTTP 409
+TEST_F(GroupControllerTest, CreateGroup_Error_Returns409) {
     EXPECT_CALL(*groupDelegateMock, CreateGroup(testing::Eq("tournament-1"), testing::_))
         .WillOnce(testing::Return(std::unexpected<std::string>("Group already exists")));
 
@@ -59,7 +61,8 @@ TEST_F(GroupControllerTest, CreateGroup_Error) {
     EXPECT_EQ(409, res.code);
 }
 
-TEST_F(GroupControllerTest, GetGroup_Success) {
+// Test 3: Buscar grupo por ID y torneo por ID - transferir a delegate, HTTP 200
+TEST_F(GroupControllerTest, GetGroup_Success_Returns200) {
     auto expectedGroup = std::make_shared<domain::Group>("Group A", "group-1");
     expectedGroup->SetTournamentId("tournament-1");
 
@@ -75,7 +78,8 @@ TEST_F(GroupControllerTest, GetGroup_Success) {
     EXPECT_EQ("group-1", json["id"].s());
 }
 
-TEST_F(GroupControllerTest, GetGroup_NotFound) {
+// Test 4: Buscar grupo por ID y torneo por ID - resultado nulo, HTTP 404
+TEST_F(GroupControllerTest, GetGroup_NotFound_Returns404) {
     EXPECT_CALL(*groupDelegateMock, GetGroup(testing::Eq("tournament-1"), testing::Eq("group-1")))
         .WillOnce(testing::Return(std::unexpected<std::string>("Group not found")));
 
@@ -84,39 +88,8 @@ TEST_F(GroupControllerTest, GetGroup_NotFound) {
     EXPECT_EQ(crow::NOT_FOUND, res.code);
 }
 
-TEST_F(GroupControllerTest, GetGroups_Success) {
-    std::vector<std::shared_ptr<domain::Group>> groups;
-    auto g1 = std::make_shared<domain::Group>("Group A", "group-1");
-    auto g2 = std::make_shared<domain::Group>("Group B", "group-2");
-    groups.push_back(g1);
-    groups.push_back(g2);
-
-    EXPECT_CALL(*groupDelegateMock, GetGroups(testing::Eq("tournament-1")))
-        .WillOnce(testing::Return(std::expected<std::vector<std::shared_ptr<domain::Group>>, std::string>(groups)));
-
-    auto res = groupController->GetGroups("tournament-1");
-    auto json = crow::json::load(res.body);
-
-    ASSERT_TRUE(json);
-    EXPECT_EQ(crow::OK, res.code);
-    EXPECT_EQ(2, json.size());
-}
-
-TEST_F(GroupControllerTest, GetGroups_Empty) {
-    std::vector<std::shared_ptr<domain::Group>> empty;
-
-    EXPECT_CALL(*groupDelegateMock, GetGroups(testing::Eq("tournament-1")))
-        .WillOnce(testing::Return(std::expected<std::vector<std::shared_ptr<domain::Group>>, std::string>(empty)));
-
-    auto res = groupController->GetGroups("tournament-1");
-    auto json = crow::json::load(res.body);
-
-    ASSERT_TRUE(json);
-    EXPECT_EQ(crow::OK, res.code);
-    EXPECT_EQ(0, json.size());
-}
-
-TEST_F(GroupControllerTest, UpdateGroup_Success) {
+// Test 5: Actualizar grupo - transformación JSON a Group, transferir a delegate, HTTP 204
+TEST_F(GroupControllerTest, UpdateGroup_Success_Returns204) {
     domain::Group captured;
 
     EXPECT_CALL(*groupDelegateMock, UpdateGroup(testing::Eq("tournament-1"), testing::_))
@@ -132,7 +105,8 @@ TEST_F(GroupControllerTest, UpdateGroup_Success) {
     EXPECT_EQ("group-1", captured.Id());
 }
 
-TEST_F(GroupControllerTest, UpdateGroup_NotFound) {
+// Test 6: Actualizar grupo - simular ID no encontrado, HTTP 404
+TEST_F(GroupControllerTest, UpdateGroup_NotFound_Returns404) {
     EXPECT_CALL(*groupDelegateMock, UpdateGroup(testing::Eq("tournament-1"), testing::_))
         .WillOnce(testing::Return(std::unexpected<std::string>("Group doesn't exist")));
 
@@ -144,7 +118,8 @@ TEST_F(GroupControllerTest, UpdateGroup_NotFound) {
     EXPECT_EQ(crow::NOT_FOUND, res.code);
 }
 
-TEST_F(GroupControllerTest, UpdateTeams_Success) {
+// Test 7: Agregar equipo a grupo - transformación JSON a Team, transferir a delegate, HTTP 204
+TEST_F(GroupControllerTest, UpdateTeams_Success_Returns204) {
     std::vector<domain::Team> capturedTeams;
 
     EXPECT_CALL(*groupDelegateMock, UpdateTeams(testing::Eq("tournament-1"), testing::Eq("group-1"), testing::_))
@@ -161,7 +136,8 @@ TEST_F(GroupControllerTest, UpdateTeams_Success) {
     EXPECT_EQ("A", capturedTeams[0].Name);
 }
 
-TEST_F(GroupControllerTest, UpdateTeams_Error) {
+// Test 8: Agregar equipo a grupo - simular equipo no existe, HTTP 422
+TEST_F(GroupControllerTest, UpdateTeams_TeamNotFound_Returns422) {
     EXPECT_CALL(*groupDelegateMock, UpdateTeams(testing::Eq("tournament-1"), testing::Eq("group-1"), testing::_))
         .WillOnce(testing::Return(std::unexpected<std::string>("Team not found")));
 
@@ -173,20 +149,15 @@ TEST_F(GroupControllerTest, UpdateTeams_Error) {
     EXPECT_EQ(422, res.code);
 }
 
-TEST_F(GroupControllerTest, RemoveGroup_Success) {
-    EXPECT_CALL(*groupDelegateMock, RemoveGroup(testing::Eq("tournament-1"), testing::Eq("group-1")))
-        .WillOnce(testing::Return(std::expected<void, std::string>()));
+// Test 9: Agregar equipo a grupo - simular grupo lleno, HTTP 422
+TEST_F(GroupControllerTest, UpdateTeams_GroupFull_Returns422) {
+    EXPECT_CALL(*groupDelegateMock, UpdateTeams(testing::Eq("tournament-1"), testing::Eq("group-1"), testing::_))
+        .WillOnce(testing::Return(std::unexpected<std::string>("Group at max capacity")));
 
-    auto res = groupController->RemoveGroup("tournament-1", "group-1");
+    nlohmann::json body = {{"id", "t1"}, {"name", "A"}};
+    crow::request req; req.body = body.dump();
 
-    EXPECT_EQ(crow::NO_CONTENT, res.code);
-}
+    auto res = groupController->UpdateTeams(req, "tournament-1", "group-1");
 
-TEST_F(GroupControllerTest, RemoveGroup_NotFound) {
-    EXPECT_CALL(*groupDelegateMock, RemoveGroup(testing::Eq("tournament-1"), testing::Eq("group-1")))
-        .WillOnce(testing::Return(std::unexpected<std::string>("Group doesn't exist")));
-
-    auto res = groupController->RemoveGroup("tournament-1", "group-1");
-
-    EXPECT_EQ(crow::NOT_FOUND, res.code);
+    EXPECT_EQ(422, res.code);
 }

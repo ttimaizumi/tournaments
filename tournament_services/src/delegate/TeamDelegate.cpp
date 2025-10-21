@@ -10,34 +10,60 @@
 TeamDelegate::TeamDelegate(std::shared_ptr<IRepository<domain::Team, std::string_view> > repository) : teamRepository(std::move(repository)) {
 }
 
-std::vector<std::shared_ptr<domain::Team>> TeamDelegate::GetAllTeams() {
-    return teamRepository->ReadAll();
-}
-
-std::shared_ptr<domain::Team> TeamDelegate::GetTeam(std::string_view id) {
+std::expected<std::vector<std::shared_ptr<domain::Team>>, std::string> TeamDelegate::GetAllTeams() {
     try {
-        return teamRepository->ReadById(id.data());
+        return teamRepository->ReadAll();
+    } catch(const std::exception& e) {
+        return std::unexpected(std::string("Error reading teams: ") + e.what());
     } catch(...) {
-        return nullptr;
+        return std::unexpected("Unknown error reading teams");
     }
 }
 
-std::string_view TeamDelegate::SaveTeam(const domain::Team& team){
+std::expected<std::shared_ptr<domain::Team>, std::string> TeamDelegate::GetTeam(std::string_view id) {
+    try {
+        auto team = teamRepository->ReadById(id.data());
+        if (team == nullptr) {
+            return nullptr;
+        }
+        return team;
+    } catch(const std::exception& e) {
+        return std::unexpected(std::string("Error reading team: ") + e.what());
+    } catch(...) {
+        return std::unexpected("Unknown error reading team");
+    }
+}
+
+std::expected<std::string, std::string> TeamDelegate::SaveTeam(const domain::Team& team){
     auto teamRepo = dynamic_cast<TeamRepository*>(teamRepository.get());
 
     if(teamRepo && teamRepo->ExistsByName(team.Name)) {
-        return "";
+        return std::unexpected("Team already exists");
     }
 
-    return teamRepository->Create(team);
+    try {
+        std::string_view id = teamRepository->Create(team);
+        return std::string(id);
+    } catch(const std::exception& e) {
+        return std::unexpected(std::string("Error creating team: ") + e.what());
+    } catch(...) {
+        return std::unexpected("Unknown error creating team");
+    }
 }
 
-std::string_view TeamDelegate::UpdateTeam(const domain::Team& team){
+std::expected<std::string, std::string> TeamDelegate::UpdateTeam(const domain::Team& team){
     auto teamRepo = dynamic_cast<TeamRepository*>(teamRepository.get());
     if(teamRepo && !teamRepo->ExistsById(team.Id)) {
-        return "";
+        return std::unexpected("Team not found");
     }
 
-    return teamRepository->Update(team);
+    try {
+        std::string_view id = teamRepository->Update(team);
+        return std::string(id);
+    } catch(const std::exception& e) {
+        return std::unexpected(std::string("Error updating team: ") + e.what());
+    } catch(...) {
+        return std::unexpected("Unknown error updating team");
+    }
 }
 

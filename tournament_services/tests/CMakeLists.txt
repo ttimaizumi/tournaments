@@ -16,8 +16,10 @@ include(GoogleTest)
 function(add_tournament_test name)
     add_executable(${name}_runner
             ${ARGN}
+            ../src/controller/GroupController.cpp
             ../src/controller/TeamController.cpp
             ../src/controller/TournamentController.cpp
+            ../src/delegate/GroupDelegate.cpp
             ../src/delegate/TeamDelegate.cpp
             ../src/delegate/TournamentDelegate.cpp
     )
