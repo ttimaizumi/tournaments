@@ -46,6 +46,11 @@ inline std::shared_ptr<Hypodermic::Container> containerSetup() {
         configuration["databaseConfig"]["poolSize"].get<size_t>());
     builder.registerInstance(pg).as<IDbConnectionProvider>();
 
+       builder.registerType<ConnectionManager>()
+       .onActivated([configuration](Hypodermic::ComponentContext&, const std::shared_ptr<ConnectionManager>& instance) {
+              instance->initialize(configuration["activemq"]["broker-url"].get<std::string>());
+       }).singleInstance();
+
     // Producer de colas (inyectar como interfaz)
     builder.registerType<QueueMessageProducer>()
            .as<IQueueMessageProducer>()

@@ -20,7 +20,7 @@ public:
         auto session = connectionManager->CreateSession();
         const auto destination = std::unique_ptr<cms::Destination>(session->createQueue(queue.data()));
         auto producer = std::unique_ptr<cms::MessageProducer>(session->createProducer(destination.get()));
-        producer->setDeliveryMode( cms::DeliveryMode::NON_PERSISTENT );
+        producer->setDeliveryMode( cms::DeliveryMode::PERSISTENT );
 
         const auto brokerMessage = std::unique_ptr<cms::TextMessage>(session->createTextMessage(message.data()));
         producer->send(brokerMessage.get());

@@ -9,6 +9,6 @@
         "connectionString" : "postgresql://tournament_svc:password@tournament_db:5432/tournament_db"
     },
     "activemq": {
-        "broker-url" : "failover://(tcp://tournament_db:61616)"
+        "broker-url" : "failover://(tcp://artemis:61616)"
     }
 }
