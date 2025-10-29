@@ -4,17 +4,20 @@ FROM fedora:42 AS builder
 # Install build dependencies
 RUN dnf install -y \
     cmake \
-    gcc \
-    gcc-c++ \
+    clang \
+    clang++ \
     make \
     git \
-    && dnf clean all
+    python3 pip cmake perl bison flex autoconf libtool automake && dnf clean all
+
+RUN git clone --depth 1 https://github.com/microsoft/vcpkg.git /opt/vcpkg/
+RUN chmod 777 -R /opt/vcpkg
+RUN /opt/vcpkg/bootstrap-vcpkg.sh
+
+RUN git clone --depth 1 https://github.com/ttimaizumi/tournaments.git /build
 
 # Set working directory for build
 WORKDIR /build
-
-# Copy source code
-COPY . /build/
 
 # Create build directory and compile
 RUN mkdir -p build && \
