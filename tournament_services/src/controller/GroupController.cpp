@@ -75,7 +75,7 @@ crow::response GroupController::GetGroup(const std::string& tournamentId, const 
 crow::response GroupController::CreateGroup(const crow::request& request, const std::string& tournamentId) {
     try {
         const json j = json::parse(request.body, nullptr, true);
-        if (!j.contains("id") || !j.contains("name"))
+        if (!j.contains("id") && !j.contains("name"))
             return crow::response{crow::BAD_REQUEST, "missing id or name"};
 
         auto g = jsonToGroup(j);
@@ -156,4 +156,4 @@ REGISTER_ROUTE(GroupController, GetGroups,   "/tournaments/<string>/groups",    
 REGISTER_ROUTE(GroupController, GetGroup,    "/tournaments/<string>/groups/<string>",       "GET"_method)
 REGISTER_ROUTE(GroupController, CreateGroup, "/tournaments/<string>/groups",                 "POST"_method)
 REGISTER_ROUTE(GroupController, UpdateGroup, "/tournaments/<string>/groups/<string>",       "PATCH"_method)
-REGISTER_ROUTE(GroupController, UpdateTeams, "/tournaments/<string>/groups/<string>/teams", "PATCH"_method)
+REGISTER_ROUTE(GroupController, UpdateTeams, "/tournaments/<string>/groups/<string>",       "POST"_method)
