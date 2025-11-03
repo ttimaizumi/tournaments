@@ -27,6 +27,7 @@ public:
     crow::response CreateGroup(const crow::request& request, const std::string& tournamentId);
     crow::response UpdateGroup(const crow::request& request);
     crow::response AddTeams(const crow::request& request, const std::string& tournamentId, const std::string& groupId);
+    crow::response GetHealth();
 };
 
 GroupController::GroupController(const std::shared_ptr<IGroupDelegate>& delegate) : groupDelegate(std::move(delegate)) {}
@@ -83,10 +84,16 @@ crow::response GroupController::AddTeams(const crow::request& request, const std
 
     return crow::response{422, result.error()};
 }
+
+crow::response GroupController::GetHealth(){
+    return crow::response{crow::OK};
+}
+
 REGISTER_ROUTE(GroupController, GetGroups, "/tournaments/<string>/groups", "GET"_method)
 REGISTER_ROUTE(GroupController, GetGroup, "/tournaments/<string>/groups/<string>", "GET"_method)
 REGISTER_ROUTE(GroupController, CreateGroup, "/tournaments/<string>/groups", "POST"_method)
 REGISTER_ROUTE(GroupController, UpdateGroup, "/tournaments/<string>/groups/<string>", "PATCH"_method)
 REGISTER_ROUTE(GroupController, AddTeams, "/tournaments/<string>/groups/<string>/teams", "PATCH"_method)
+REGISTER_ROUTE(GroupController, GetHealth, "/health", "GET"_method)
 
 #endif /* A7B3517D_1DC1_4B59_A78C_D3E03D29710C */
