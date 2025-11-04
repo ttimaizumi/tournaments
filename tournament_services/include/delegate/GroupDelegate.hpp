@@ -19,13 +19,13 @@
 class GroupDelegate : public IGroupDelegate {
     std::shared_ptr<IRepository<domain::Tournament, std::string>>  tournamentRepository;
     std::shared_ptr<IGroupRepository>                               groupRepository;
-    std::shared_ptr<IRepository<domain::Team, std::string>>         teamRepository;   // <- std::string para Id
+    std::shared_ptr<IRepository<domain::Team, std::string_view>>         teamRepository;   // <- std::string para Id
     std::shared_ptr<IQueueMessageProducer>                          queueProducer;
 
 public:
     GroupDelegate(const std::shared_ptr<IRepository<domain::Tournament, std::string>>& tRepo,
                   const std::shared_ptr<IGroupRepository>& gRepo,
-                  const std::shared_ptr<IRepository<domain::Team, std::string>>& teamRepo, // <- std::string
+                  const std::shared_ptr<IRepository<domain::Team, std::string_view>>& teamRepo, // <- std::string
                   const std::shared_ptr<IQueueMessageProducer>& producer);
 
     std::expected<std::string, std::string>

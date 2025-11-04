@@ -3,12 +3,13 @@
 
 using nlohmann::json;
 
-static constexpr std::size_t kMaxTeamsPerGroup = 16;
+static constexpr std::size_t kMaxTeamsPerGroup = 16; // Espacio en memoria
+#define MAX_TEAMS_PER_GROUP = 32 // Define hace copypaste
 
 GroupDelegate::GroupDelegate(
     const std::shared_ptr<IRepository<domain::Tournament, std::string>>& tRepo,
     const std::shared_ptr<IGroupRepository>& gRepo,
-    const std::shared_ptr<IRepository<domain::Team, std::string>>& teamRepo, // <- std::string
+    const std::shared_ptr<IRepository<domain::Team, std::string_view>>& teamRepo, // <- std::string
     const std::shared_ptr<IQueueMessageProducer>& producer)
     : tournamentRepository(tRepo)
     , groupRepository(gRepo)
@@ -38,7 +39,8 @@ GroupDelegate::CreateGroup(const std::string_view& tournamentId, const domain::G
     if (id.empty()) return std::unexpected(std::string("group-already-exists"));
 
     if (queueProducer) {
-        queueProducer->SendMessage(id, "group.created"); // test espera ("g1","group.created")
+        // queueProducer->SendMessage(id, "group.created"); // test espera ("g1","group.created")
+        queueProducer->SendMessage(std::string_view{id}, std::string_view{"group.created"});
     }
     return id;
 }
