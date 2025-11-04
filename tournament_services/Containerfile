@@ -5,13 +5,13 @@ FROM fedora:42 AS builder
 RUN dnf install -y ninja gcc vim gcc gcc-c++ clang openssh-server lldb clangd libicu python3 pip cmake perl gdb awk npm git bison flex autoconf openssl libtool automake kernel-devel
 RUN  dnf -y update
 
-# RUN git clone --depth 1 https://github.com/microsoft/vcpkg.git /opt/vcpkg/
-# RUN chmod 777 -R /opt/vcpkg
+RUN git clone --depth 1 https://github.com/microsoft/vcpkg.git /opt/vcpkg/
+RUN chmod 777 -R /opt/vcpkg
 
 RUN /opt/vcpkg/bootstrap-vcpkg.sh
 RUN export VCPKG_BINARY_SOURCES="clear;files,/opt/vcpkg/binary-cache,readwrite"
 
-RUN git clone --depth 1 https://github.com/ttimaizumi/tournaments.git /root/tournaments
+RUN git clone --depth 1 https://github.com/nicosept/tournaments.git /root/tournaments
 
 # Set working directory for build
 WORKDIR /root/tournaments
