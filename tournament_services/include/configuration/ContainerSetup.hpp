@@ -27,6 +27,7 @@
 #include "delegate/IGroupDelegate.hpp"
 #include "delegate/GroupDelegate.hpp"
 #include "controller/GroupController.hpp"
+#include "delegate/ITournamentDelegate.hpp"
 
 namespace config {
     inline std::shared_ptr<Hypodermic::Container> containerSetup() {
@@ -63,8 +64,8 @@ namespace config {
                 singleInstance();
 
         builder.registerType<TournamentDelegate>()
-                .as<ITournamentDelegate>()
-                .singleInstance();
+               .as<ITournamentDelegate>()
+               .singleInstance();
         builder.registerType<TournamentController>().singleInstance();
 
         builder.registerType<GroupDelegate>().as<IGroupDelegate>()

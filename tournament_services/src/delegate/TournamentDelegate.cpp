@@ -1,31 +1,112 @@
-//
-// Created by tomas on 8/31/25.
-//
-#include <string_view>
-#include <memory>
-
 #include "delegate/TournamentDelegate.hpp"
 
-#include "persistence/repository/IRepository.hpp"
+#include <expected>
+#include <iostream>
+#include <regex>
+#include <utility>
+#include <pqxx/pqxx>
 
-TournamentDelegate::TournamentDelegate(std::shared_ptr<IRepository<domain::Tournament, std::string> > repository, std::shared_ptr<QueueMessageProducer> producer) : tournamentRepository(std::move(repository)), producer(std::move(producer)) {
+#include "exception/Error.hpp"
+
+TournamentDelegate::TournamentDelegate(
+    std::shared_ptr<IRepository<domain::Tournament, std::string>> repository)
+    : tournamentRepository(std::move(repository)) {}
+
+std::expected<std::vector<std::shared_ptr<domain::Tournament>>, Error>
+TournamentDelegate::ReadAll() {
+
+  try {
+    auto tournaments = tournamentRepository->ReadAll();
+    return tournaments;
+
+  } catch (const std::exception& e) {
+    return std::unexpected(Error::UNKNOWN_ERROR);
+  }
 }
 
-std::string TournamentDelegate::CreateTournament(std::shared_ptr<domain::Tournament> tournament) {
-    //fill groups according to max groups
-    std::shared_ptr<domain::Tournament> tp = std::move(tournament);
-    // for (auto[i, g] = std::tuple{0, 'A'}; i < tp->Format().NumberOfGroups(); i++,g++) {
-    //     tp->Groups().push_back(domain::Group{std::format("Tournament {}", g)});
-    // }
+std::expected<std::shared_ptr<domain::Tournament>, Error> TournamentDelegate::GetTournament(std::string_view id) {
+  if (!std::regex_match(std::string(id), ID_VALUE)) {
+    return std::unexpected(Error::INVALID_FORMAT);
+  }
+  try {
+    auto tournament = tournamentRepository->ReadById(std::string(id));
+    if (!tournament) {
+      return std::unexpected(Error::NOT_FOUND);
+    }
+    return tournament;
 
-    std::string id = tournamentRepository->Create(*tp);
-    producer->SendMessage(id, "tournament.created");
+  } catch (const pqxx::data_exception& e) {
+    if (e.sqlstate() == "22P02") {
+      return std::unexpected(Error::INVALID_FORMAT);
+    }
+    return std::unexpected(Error::UNKNOWN_ERROR);
 
-    //if groups are completed also create matches
-
-    return id;
+  } catch (const std::exception& e) {
+    return std::unexpected(Error::UNKNOWN_ERROR);
+  }
 }
 
-std::vector<std::shared_ptr<domain::Tournament> > TournamentDelegate::ReadAll() {
-    return tournamentRepository->ReadAll();
+std::expected<std::string, Error> TournamentDelegate::CreateTournament(
+
+  const domain::Tournament& tournament) {
+
+    if (!tournament.Id().empty() || tournament.Name().empty()) {
+      return std::unexpected(Error::INVALID_FORMAT);
+    }
+
+
+  try {
+    auto id_view = tournamentRepository->Create(tournament);
+    if (id_view.empty()) {
+      return std::unexpected(Error::UNKNOWN_ERROR);
+    }
+    return std::string{id_view};
+
+  } catch (const pqxx::unique_violation& e) {
+    if (e.sqlstate() == "23505") {
+      return std::unexpected(Error::DUPLICATE);
+    }
+    return std::unexpected(Error::UNKNOWN_ERROR);
+
+  } catch (const std::exception& e) {
+    return std::unexpected(Error::UNKNOWN_ERROR);
+  }
+}
+
+std::expected<std::string, Error> TournamentDelegate::UpdateTournament(
+    const domain::Tournament& tournament) {
+    if (!std::regex_match(std::string(tournament.Id()), ID_VALUE)) {
+      return std::unexpected(Error::INVALID_FORMAT);
+    }
+
+  try {
+    auto updated_view = tournamentRepository->Update(tournament);
+    if (updated_view.empty()) {
+      return std::unexpected(Error::NOT_FOUND);
+    }
+    return std::string{updated_view};
+  } catch (const pqxx::data_exception& e) {
+    if (e.sqlstate() == "22P02") {
+      return std::unexpected(Error::INVALID_FORMAT);
+    }
+    return std::unexpected(Error::UNKNOWN_ERROR);
+  } catch (const std::exception& e) {
+    return std::unexpected(Error::UNKNOWN_ERROR);
+  }
+}
+
+std::expected<void, Error> TournamentDelegate::DeleteTournament(std::string_view id) {
+  try {
+    tournamentRepository->Delete(std::string(id));
+    return {};
+
+  } catch (const pqxx::data_exception& e) {
+    if (e.sqlstate() == "22P02") {
+      return std::unexpected(Error::INVALID_FORMAT);
+    }
+    return std::unexpected(Error::UNKNOWN_ERROR);
+
+  } catch (const std::exception&) {
+    return std::unexpected(Error::UNKNOWN_ERROR);
+  }
 }

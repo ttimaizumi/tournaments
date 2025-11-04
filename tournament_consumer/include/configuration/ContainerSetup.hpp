@@ -17,8 +17,10 @@
 #include "persistence/repository/TeamRepository.hpp"
 #include "persistence/configuration/PostgresConnectionProvider.hpp"
 #include "persistence/repository/TournamentRepository.hpp"
-#include "../cms/QueueMessageListener.hpp"
+#include "persistence/repository/GroupRepository.hpp"
+#include "persistence/repository/IGroupRepository.hpp"
 #include "cms/GroupAddTeamListener.hpp"
+#include "../cms/QueueMessageListener.hpp"
 
 namespace config {
     inline std::shared_ptr<Hypodermic::Container> containerSetup() {
@@ -42,6 +44,8 @@ namespace config {
         builder.registerType<TeamRepository>().as<IRepository<domain::Team, std::string_view>>().singleInstance();
 
         builder.registerType<TournamentRepository>().as<IRepository<domain::Tournament, std::string>>().singleInstance();
+
+        builder.registerType<GroupRepository>().as<IGroupRepository>().singleInstance();
 
         return builder.build();
     }

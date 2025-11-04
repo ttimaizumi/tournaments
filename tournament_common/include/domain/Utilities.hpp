@@ -116,7 +116,7 @@ namespace domain {
             group.TournamentId() = json["tournamentId"].get<std::string>();
         }
         json["name"].get_to(group.Name());
-        if (json.contains("teams")) {
+        if(json.contains("teams") && json["teams"].is_array()) {
             json["teams"].get_to(group.Teams());
         }
     }

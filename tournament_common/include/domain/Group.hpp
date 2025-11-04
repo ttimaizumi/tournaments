@@ -42,7 +42,7 @@ namespace domain {
             return  tournamentId;
         }
 
-        [[nodiscard]] std::vector<Team> Teams() const {
+        [[nodiscard]] const std::vector<Team>& Teams() const {
             return this->teams;
         }
 
