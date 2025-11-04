@@ -19,6 +19,7 @@ class GroupDelegate : public IGroupDelegate{
     std::shared_ptr<TournamentRepository> tournamentRepository;
     std::shared_ptr<IGroupRepository> groupRepository;
     std::shared_ptr<TeamRepository> teamRepository;
+    std::shared_ptr<IQueueMessageProducer> messageProducer;
 
 public:
     GroupDelegate(const std::shared_ptr<TournamentRepository>& tournamentRepository, const std::shared_ptr<IGroupRepository>& groupRepository, const std::shared_ptr<TeamRepository>& teamRepository);

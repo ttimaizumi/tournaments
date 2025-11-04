@@ -15,6 +15,7 @@
 #include "RunConfiguration.hpp"
 #include "cms/ConnectionManager.hpp"
 #include "delegate/TeamDelegate.hpp"
+#include "controller/HealthController.hpp"
 #include "controller/TeamController.hpp"
 #include "controller/TournamentController.hpp"
 #include "delegate/TournamentDelegate.hpp"
@@ -49,7 +50,7 @@ namespace config {
             })
             .singleInstance();
 
-        builder.registerType<QueueMessageProducer>().named("tournamentAddTeamQueue");
+        builder.registerType<QueueMessageProducer>().as<IQueueMessageProducer>().named("tournamentAddTeamQueue");
         builder.registerType<QueueResolver>().as<IResolver<IQueueMessageProducer> >().named("queueResolver").
                 singleInstance();
 
@@ -67,8 +68,13 @@ namespace config {
                .singleInstance();
         builder.registerType<TournamentController>().singleInstance();
 
-        builder.registerType<GroupDelegate>().as<IGroupDelegate>().singleInstance();
+        builder.registerType<GroupDelegate>().as<IGroupDelegate>()
+            .with<IQueueMessageProducer>([](Hypodermic::ComponentContext& context){
+                return context.resolveNamed<QueueMessageProducer>("tournamentAddTeamQueue");
+            })
+            .singleInstance();
         builder.registerType<GroupController>().singleInstance();
+        builder.registerType<HealthController>().singleInstance();
 
         return builder.build();
     }
