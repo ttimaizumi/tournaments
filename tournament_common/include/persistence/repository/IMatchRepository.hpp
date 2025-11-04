@@ -15,7 +15,7 @@ class IMatchRepository : public IRepository<domain::Match, std::string> {
 public:
     virtual ~IMatchRepository() = default;
     //Find match with only one team to be added
-    virtual domain::Match FindLastOpenMatch(const std::string_view& tournamentId) = 0;
-    virtual std::vector<std::shared_ptr<domain::Match>> FindMatchesByTournamentAndRound(const std::string_view& tournamentId) = 0;
+    virtual std::shared_ptr<domain::Match> FindLastOpenMatch(const std::string_view& tournamentId) = 0;
+    virtual std::vector<domain::Match> FindMatchesByTournamentAndRound(const std::string_view& tournamentId) = 0;
 };
 #endif //TOURNAMENTS_IMATCHREPOSITORY_HPP

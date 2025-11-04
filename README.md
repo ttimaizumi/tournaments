@@ -13,6 +13,8 @@ Load Balancer commands
 ````
 podman build -v /home/tomas/workspace/container/cache/vcpkg/:/opt/vcpkg:z -f tournament_services/Containerfile -t tournament_services
 
+podman build -f tournament_services/Containerfile -t tournament_services
+
 podman run --replace -d --network development --name tournament_services_1 -p 8081:8080 tournament_services
 podman run --replace -d --network development --name tournament_services_2 -p 8082:8080 tournament_services
 podman run --replace -d --network development --name tournament_services_3 -p 8083:8080 tournament_services

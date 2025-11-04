@@ -20,11 +20,9 @@ public:
 inline MatchDelegate::MatchDelegate(const std::shared_ptr<IMatchRepository> &matchRepository) : matchRepository(matchRepository) {}
 
 inline void MatchDelegate::ProcessTeamAddition(const domain::TeamAddEvent& teamAddEvent) {
-    //If there's a match to assign the team?
-    //Add team to match
-    //If no open match is found the creation a match with team
-
-
+    //If tournament has all teams and all matches are created?
+    //then create matches
+    //else move on
 }
 
 #endif //CONSUMER_MATCHDELEGATE_HPP
