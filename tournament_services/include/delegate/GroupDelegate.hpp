@@ -14,6 +14,7 @@
 #include "persistence/repository/TeamRepository.hpp"
 #include "exception/Error.hpp"
 #include "domain/Constants.hpp"
+#include "cms/IQueueMessageProducer.hpp"
 
 class GroupDelegate : public IGroupDelegate{
     std::shared_ptr<TournamentRepository> tournamentRepository;
