@@ -2,8 +2,8 @@
 FROM fedora:42 AS builder
 
 # Install build dependencies
-RUN dnf install -y ninja gcc vim gcc gcc-c++ clang openssh-server lldb clangd libicu python3 pip cmake perl gdb awk npm git bison flex autoconf openssl libtool automake kernel-devel
 RUN  dnf -y update
+RUN dnf install -y ninja gcc vim gcc gcc-c++ clang openssh-server lldb clangd libicu python3 pip cmake perl gdb awk npm git bison flex autoconf openssl libtool automake kernel-devel kernel-debug kernel-debug-devel kernel
 
 RUN git clone --depth 1 https://github.com/microsoft/vcpkg.git /opt/vcpkg/
 RUN chmod 777 -R /opt/vcpkg
@@ -24,8 +24,7 @@ RUN cmake --build /root/tournaments/cmake-build-release --target tournament_serv
 FROM fedora-minimal:42
 
 # Set metadata
-LABEL maintainer="your-email@example.com"
-LABEL description="CMake application on Fedora"
+LABEL maintainer="ttimaizumi@outlook.com"
 
 # Install only runtime dependencies (if needed)
 # Example: If your app needs specific libraries

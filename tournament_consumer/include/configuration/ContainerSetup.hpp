@@ -9,7 +9,6 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <memory>
-#include <print>
 
 #include "configuration/DatabaseConfiguration.hpp"
 #include "cms/ConnectionManager.hpp"
@@ -20,7 +19,9 @@
 #include "persistence/repository/GroupRepository.hpp"
 #include "persistence/repository/IGroupRepository.hpp"
 #include "cms/GroupAddTeamListener.hpp"
-#include "../cms/QueueMessageListener.hpp"
+#include "delegate/MatchDelegate.hpp"
+#include "persistence/repository/IMatchRepository.hpp"
+#include "persistence/repository/MatchRepository.hpp"
 
 namespace config {
     inline std::shared_ptr<Hypodermic::Container> containerSetup() {
@@ -42,8 +43,10 @@ namespace config {
         builder.registerType<GroupAddTeamListener>();
 
         builder.registerType<TeamRepository>().as<IRepository<domain::Team, std::string_view>>().singleInstance();
-
         builder.registerType<TournamentRepository>().as<IRepository<domain::Tournament, std::string>>().singleInstance();
+        builder.registerType<MatchRepository>().as<IMatchRepository>().singleInstance();
+
+        builder.registerType<MatchDelegate>().singleInstance();
 
         builder.registerType<GroupRepository>().as<IGroupRepository>().singleInstance();
 
