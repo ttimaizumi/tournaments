@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites tests="5" failures="0" disabled="0" errors="0" time="0." timestamp="2025-10-19T19:21:56.384" name="AllTests">
+  <testsuite name="TeamControllerTest" tests="4" failures="0" disabled="0" skipped="0" errors="0" time="0." timestamp="2025-10-19T19:21:56.384">
+    <testcase name="GetTeamById_ErrorFormat" file="/home/developer/workspace/tournaments/tournament_services/tests/controller/TeamControllerTest.cpp" line="33" status="run" result="completed" time="0." timestamp="2025-10-19T19:21:56.384" classname="TeamControllerTest" />
+    <testcase name="GetTeamById" file="/home/developer/workspace/tournaments/tournament_services/tests/controller/TeamControllerTest.cpp" line="42" status="run" result="completed" time="0." timestamp="2025-10-19T19:21:56.384" classname="TeamControllerTest" />
+    <testcase name="GetTeamNotFound" file="/home/developer/workspace/tournaments/tournament_services/tests/controller/TeamControllerTest.cpp" line="57" status="run" result="completed" time="0." timestamp="2025-10-19T19:21:56.384" classname="TeamControllerTest" />
+    <testcase name="SaveTeamTest" file="/home/developer/workspace/tournaments/tournament_services/tests/controller/TeamControllerTest.cpp" line="66" status="run" result="completed" time="0." timestamp="2025-10-19T19:21:56.384" classname="TeamControllerTest" />
+  </testsuite>
+  <testsuite name="TournamentControllerTest" tests="1" failures="0" disabled="0" skipped="0" errors="0" time="0." timestamp="2025-10-19T19:21:56.384">
+    <testcase name="CreateTournament" file="/home/developer/workspace/tournaments/tournament_services/tests/controller/TournamentControllerTest.cpp" line="6" status="run" result="completed" time="0." timestamp="2025-10-19T19:21:56.384" classname="TournamentControllerTest" />
+  </testsuite>
+</testsuites>
