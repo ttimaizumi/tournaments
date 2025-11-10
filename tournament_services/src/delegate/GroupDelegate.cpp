@@ -185,15 +185,13 @@ std::expected<void, Error> GroupDelegate::UpdateTeams(const std::string_view& to
         return std::unexpected(Error::UNPROCESSABLE_ENTITY);
     }
     for (const auto& team : teams) {
-        // Validacion de duplicados
-        if (groupRepository->FindByGroupIdAndTeamId(groupId, team.Id) != nullptr) {
-            return std::unexpected(Error::DUPLICATE);
-        }
-    }
-    for (const auto& team : teams) {
         // Validacion de formato UUID de cada equipo
         if (!std::regex_match(team.Id, ID_VALUE)) {
             return std::unexpected(Error::INVALID_FORMAT);
+        }
+        // Validacion de duplicados
+        if (groupRepository->FindByGroupIdAndTeamId(groupId, team.Id) != nullptr) {
+            return std::unexpected(Error::DUPLICATE);
         }
         // Validacion de existencia de cada equipo
         const auto persistedTeam = teamRepository->ReadById(team.Id);

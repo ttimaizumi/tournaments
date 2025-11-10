@@ -9,8 +9,10 @@
 #include "domain/Tournament.hpp"
 #include "delegate/GroupDelegate.hpp"
 #include "persistence/repository/IGroupRepository.hpp"
+#include "persistence/repository/IRepository.hpp"
 #include "persistence/repository/TournamentRepository.hpp"
 #include "persistence/repository/TeamRepository.hpp"
+#include "persistence/configuration/IDbConnectionProvider.hpp"
 #include "cms/IQueueMessageProducer.hpp"
 #include "exception/Error.hpp"
 
@@ -28,9 +30,9 @@ class MockGroupRepository : public IGroupRepository {
     MOCK_METHOD(void, UpdateGroupAddTeam, (const std::string_view& groupId, const std::shared_ptr<domain::Team> & team), (override));
 };
 
-class MockTournamentRepository : public TournamentRepository {
+// Solo implementan Interfaces
+class MockTournamentRepository : public IRepository<domain::Tournament, std::string> {
 public:
-    MockTournamentRepository() : TournamentRepository(nullptr) {}
     MOCK_METHOD(std::shared_ptr<domain::Tournament>, ReadById, (std::string id), (override));
     MOCK_METHOD(std::string, Create, (const domain::Tournament& entity), (override));
     MOCK_METHOD(std::string, Update, (const domain::Tournament& entity), (override));
@@ -38,9 +40,8 @@ public:
     MOCK_METHOD(std::vector<std::shared_ptr<domain::Tournament>>, ReadAll, (), (override));
 };
 
-class MockTeamRepository : public TeamRepository {
+class MockTeamRepository : public IRepository<domain::Team, std::string_view> {
 public:
-    MockTeamRepository() : TeamRepository(nullptr) {}
     MOCK_METHOD(std::shared_ptr<domain::Team>, ReadById, (std::string_view id), (override));
     MOCK_METHOD(std::string_view, Create, (const domain::Team& entity), (override));
     MOCK_METHOD(std::string_view, Update, (const domain::Team& entity), (override));
@@ -48,11 +49,66 @@ public:
     MOCK_METHOD(std::vector<std::shared_ptr<domain::Team>>, ReadAll, (), (override));
 };
 
+// Necesario para que puedan ser usadas por GroupDeleagate
+class TournamentRepositoryAdapter : public TournamentRepository {
+private:
+    std::shared_ptr<IRepository<domain::Tournament, std::string>> mock;
+    
+    static std::shared_ptr<IDbConnectionProvider> CreateDummyProvider() {
+        static auto provider = std::make_shared<DummyConnectionProvider>();
+        return provider;
+    }
+    
+    struct DummyConnectionProvider : public IDbConnectionProvider {
+        PooledConnection Connection() override { 
+            return PooledConnection(nullptr, [](IDbConnection*){}); 
+        }
+    };
+
+public:
+    TournamentRepositoryAdapter(std::shared_ptr<IRepository<domain::Tournament, std::string>> mockRepo) 
+        : TournamentRepository(CreateDummyProvider()), mock(mockRepo) {}
+    
+    std::shared_ptr<domain::Tournament> ReadById(std::string id) override { return mock->ReadById(id); }
+    std::string Create(const domain::Tournament& entity) override { return mock->Create(entity); }
+    std::string Update(const domain::Tournament& entity) override { return mock->Update(entity); }
+    void Delete(std::string id) override { mock->Delete(id); }
+    std::vector<std::shared_ptr<domain::Tournament>> ReadAll() override { return mock->ReadAll(); }
+};
+
+class TeamRepositoryAdapter : public TeamRepository {
+private:
+    std::shared_ptr<IRepository<domain::Team, std::string_view>> mock;
+    
+    static std::shared_ptr<IDbConnectionProvider> CreateDummyProvider() {
+        static auto provider = std::make_shared<DummyConnectionProvider>();
+        return provider;
+    }
+    
+    struct DummyConnectionProvider : public IDbConnectionProvider {
+        PooledConnection Connection() override { 
+            return PooledConnection(nullptr, [](IDbConnection*){}); 
+        }
+    };
+
+public:
+    TeamRepositoryAdapter(std::shared_ptr<IRepository<domain::Team, std::string_view>> mockRepo) 
+        : TeamRepository(CreateDummyProvider()), mock(mockRepo) {}
+    
+    std::shared_ptr<domain::Team> ReadById(std::string_view id) override { return mock->ReadById(id); }
+    std::string_view Create(const domain::Team& entity) override { return mock->Create(entity); }
+    std::string_view Update(const domain::Team& entity) override { return mock->Update(entity); }
+    void Delete(std::string_view id) override { mock->Delete(id); }
+    std::vector<std::shared_ptr<domain::Team>> ReadAll() override { return mock->ReadAll(); }
+};
+
 class GroupDelegateTest : public ::testing::Test {
     protected:
     std::shared_ptr<MockTournamentRepository> mockTournamentRepository;
     std::shared_ptr<MockGroupRepository> mockGroupRepository;
     std::shared_ptr<MockTeamRepository> mockTeamRepository;
+    std::shared_ptr<TournamentRepositoryAdapter> tournamentAdapter;
+    std::shared_ptr<TeamRepositoryAdapter> teamAdapter;
     std::shared_ptr<GroupDelegate> groupDelegate;
     
     const std::string validTournamentId = "12345678-1234-1234-1234-123456789abc";
@@ -63,7 +119,11 @@ class GroupDelegateTest : public ::testing::Test {
         mockTournamentRepository = std::make_shared<MockTournamentRepository>();
         mockGroupRepository = std::make_shared<MockGroupRepository>();
         mockTeamRepository = std::make_shared<MockTeamRepository>();
-        groupDelegate = std::make_shared<GroupDelegate>(mockTournamentRepository, mockGroupRepository, mockTeamRepository);
+        
+        tournamentAdapter = std::make_shared<TournamentRepositoryAdapter>(mockTournamentRepository);
+        teamAdapter = std::make_shared<TeamRepositoryAdapter>(mockTeamRepository);
+        
+        groupDelegate = std::make_shared<GroupDelegate>(tournamentAdapter, mockGroupRepository, teamAdapter);
     }
 };
 
