@@ -21,8 +21,30 @@ void MatchDelegate::ProcessTeamAddition(const domain::TeamAddEvent& teamAddEvent
 
         // Check if this group now has 4 teams (complete)
         if (group->Teams().size() == 4) {
-            std::println("Group {} is complete with 4 teams. Creating regular matches...", teamAddEvent.groupId);
-            CreateRegularMatchesForGroup(teamAddEvent.tournamentId, teamAddEvent.groupId, group->Teams());
+            std::println("Group {} is complete with 4 teams. Checking if matches exist...", teamAddEvent.groupId);
+
+            // Check if matches already exist for this group by checking if any regular matches
+            // exist between teams in this group
+            auto regularMatches = matchRepository->FindMatchesByTournamentAndRound(teamAddEvent.tournamentId, domain::Round::REGULAR);
+
+            bool matchesExist = false;
+            for (const auto& match : regularMatches) {
+                // Check if this match involves teams from this group
+                for (const auto& team : group->Teams()) {
+                    if (match->HomeTeamId() == team.Id || match->VisitorTeamId() == team.Id) {
+                        matchesExist = true;
+                        break;
+                    }
+                }
+                if (matchesExist) break;
+            }
+
+            if (matchesExist) {
+                std::println("Matches already exist for group {}, skipping creation", teamAddEvent.groupId);
+            } else {
+                std::println("Creating regular matches for group {}...", teamAddEvent.groupId);
+                CreateRegularMatchesForGroup(teamAddEvent.tournamentId, teamAddEvent.groupId, group->Teams());
+            }
         } else {
             std::println("Group {} has {} teams, waiting for more...", teamAddEvent.groupId, group->Teams().size());
         }

@@ -203,7 +203,8 @@ namespace domain {
                 {"id", match.VisitorTeamId()},
                 {"name", match.VisitorTeamName()}
             }},
-            {"round", roundToString(match.GetRound())}
+            {"round", roundToString(match.GetRound())},
+            {"tournamentId", match.TournamentId()}
         };
 
         if (!match.Id().empty()) {
