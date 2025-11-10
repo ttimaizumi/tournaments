@@ -54,7 +54,7 @@ public:
 
             connectionPool.back()->prepare("select_match_by_id", "SELECT id, document FROM matches WHERE id = $1");
             connectionPool.back()->prepare("insert_match", "INSERT INTO matches (document) VALUES ($1) RETURNING id");
-            connectionPool.back()->prepare("update_match", "UPDATE matches SET document = $1, last_update_date = CURRENT_TIMESTAMP WHERE id = $2 RETURNING id");
+            connectionPool.back()->prepare("update_match", "UPDATE matches SET document = $1 WHERE id = $2 RETURNING id");
             connectionPool.back()->prepare("delete_match", "DELETE FROM matches WHERE id = $1");
             connectionPool.back()->prepare("select_matches_by_tournament", "SELECT id, document FROM matches WHERE document->>'tournamentId' = $1");
             connectionPool.back()->prepare("select_played_matches_by_tournament", "SELECT id, document FROM matches WHERE document->>'tournamentId' = $1 AND document ? 'score'");

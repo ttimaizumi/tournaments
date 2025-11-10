@@ -11,14 +11,11 @@
 #include "IMatchDelegate.hpp"
 
 class MatchDelegate : public IMatchDelegate {
-//    std::shared_ptr<IMatchRepository> matchRepository;
+    std::shared_ptr<IMatchRepository> matchRepository;
     std::shared_ptr<IQueueMessageProducer> queueMessageProducer;
-    std::shared_ptr<IRepository<domain::Match, std::string_view>> matchRepository;
 
 public:
-//    explicit MatchDelegate(std::shared_ptr<IMatchRepository> repository,
-//                          std::shared_ptr<IQueueMessageProducer> queueProducer);
-    explicit MatchDelegate(std::shared_ptr<IRepository<domain::Match, std::string_view>> repository,
+    explicit MatchDelegate(std::shared_ptr<IMatchRepository> repository,
                           std::shared_ptr<IQueueMessageProducer> queueProducer);
 
     std::expected<std::shared_ptr<domain::Match>, std::string>
