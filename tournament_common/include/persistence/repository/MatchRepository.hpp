@@ -21,7 +21,7 @@ public:
         auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
 
         pqxx::work tx(*(connection->connection));
-        pqxx::result result = tx.exec_params("SELECT id, document FROM matches WHERE id = $1", id);
+        pqxx::result result = tx.exec(pqxx::prepped{"select_match_by_id"}, id.data());
 
         if (result.empty()) {
             tx.commit();
@@ -44,10 +44,7 @@ public:
         nlohmann::json matchBody = entity;
 
         pqxx::work tx(*(connection->connection));
-        pqxx::result result = tx.exec_params(
-            "INSERT INTO matches (document) VALUES ($1) RETURNING id",
-            matchBody.dump()
-        );
+        pqxx::result result = tx.exec(pqxx::prepped{"insert_match"}, matchBody.dump());
         tx.commit();
 
         return result[0]["id"].c_str();
@@ -59,10 +56,10 @@ public:
         nlohmann::json matchBody = entity;
 
         pqxx::work tx(*(connection->connection));
-        pqxx::result result = tx.exec_params(
-            "UPDATE matches SET document = $1, last_update_date = CURRENT_TIMESTAMP WHERE id = $2 RETURNING id",
-            matchBody.dump(), entity.Id()
-        );
+        pqxx::result result = tx.exec(
+                pqxx::prepped{"update_match"},
+                pqxx::params{entity.Id(), matchBody.dump()}
+                );
         tx.commit();
 
         return result[0]["id"].c_str();
@@ -73,7 +70,7 @@ public:
         auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
 
         pqxx::work tx(*(connection->connection));
-        tx.exec_params("DELETE FROM matches WHERE id = $1", id);
+        tx.exec(pqxx::prepped{"delete_match"}, id);
         tx.commit();
     }
 
@@ -96,17 +93,13 @@ public:
 
         return matches;
     }
-
     std::vector<std::shared_ptr<domain::Match>> FindByTournamentId(const std::string_view& tournamentId) override {
         std::vector<std::shared_ptr<domain::Match>> matches;
         auto pooled = connectionProvider->Connection();
         auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
 
         pqxx::work tx(*(connection->connection));
-        pqxx::result result = tx.exec_params(
-            "SELECT id, document FROM matches WHERE document->>'tournamentId' = $1",
-            tournamentId.data()
-        );
+        pqxx::result result = tx.exec(pqxx::prepped{"select_matches_by_tournament"}, tournamentId.data());
         tx.commit();
 
         for(auto row : result) {
@@ -126,10 +119,7 @@ public:
         auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
 
         pqxx::work tx(*(connection->connection));
-        pqxx::result result = tx.exec_params(
-            "SELECT id, document FROM matches WHERE document->>'tournamentId' = $1 AND document ? 'score'",
-            tournamentId.data()
-        );
+        pqxx::result result = tx.exec(pqxx::prepped{"select_played_matches_by_tournament"}, tournamentId.data());
         tx.commit();
 
         for(auto row : result) {
@@ -149,10 +139,7 @@ public:
         auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
 
         pqxx::work tx(*(connection->connection));
-        pqxx::result result = tx.exec_params(
-            "SELECT id, document FROM matches WHERE document->>'tournamentId' = $1 AND NOT (document ? 'score')",
-            tournamentId.data()
-        );
+        pqxx::result result = tx.exec(pqxx::prepped{"select_pending_matches_by_tournament"}, tournamentId.data());
         tx.commit();
 
         for(auto row : result) {
@@ -171,9 +158,9 @@ public:
         auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
 
         pqxx::work tx(*(connection->connection));
-        pqxx::result result = tx.exec_params(
-            "SELECT id, document FROM matches WHERE id = $1 AND document->>'tournamentId' = $2",
-            matchId.data(), tournamentId.data()
+        pqxx::result result = tx.exec(
+                pqxx::prepped{"select_match_by_tournament_and_match_id"},
+                pqxx::params{matchId.data(), tournamentId.data()}
         );
 
         if (result.empty()) {
@@ -192,8 +179,6 @@ public:
     }
 
     std::shared_ptr<domain::Match> FindLastOpenMatch(const std::string_view& tournamentId) override {
-        // This method is for finding incomplete matches during team assignment
-        // Not needed for MUNDIAL implementation
         return nullptr;
     }
 
@@ -205,9 +190,9 @@ public:
         std::string roundStr = domain::roundToString(round);
 
         pqxx::work tx(*(connection->connection));
-        pqxx::result result = tx.exec_params(
-            "SELECT id, document FROM matches WHERE document->>'tournamentId' = $1 AND document->>'round' = $2",
-            tournamentId.data(), roundStr
+        pqxx::result result = tx.exec(
+                pqxx::prepped{"select_matches_by_tournament_and_round"},
+                pqxx::params{tournamentId.data(), roundStr}
         );
         tx.commit();
 
@@ -227,10 +212,7 @@ public:
         auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
 
         pqxx::work tx(*(connection->connection));
-        pqxx::result result = tx.exec_params(
-            "SELECT COUNT(*) as count FROM tournaments WHERE id = $1",
-            tournamentId.data()
-        );
+        pqxx::result result = tx.exec(pqxx::prepped{"check_tournament_exists_by_id"}, tournamentId.data());
         tx.commit();
 
         return result[0]["count"].as<int>() > 0;
