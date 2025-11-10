@@ -8,6 +8,7 @@
 #include <string>
 #include <nlohmann/json.hpp>
 #include "domain/Match.hpp"
+#include "domain/Utilities.hpp"
 
 namespace domain {
     struct ScoreUpdateEvent {
