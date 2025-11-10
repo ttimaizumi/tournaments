@@ -58,7 +58,7 @@ public:
         pqxx::work tx(*(connection->connection));
         pqxx::result result = tx.exec(
                 pqxx::prepped{"update_match"},
-                pqxx::params{entity.Id(), matchBody.dump()}
+                pqxx::params{matchBody.dump(), entity.Id()}
                 );
         tx.commit();
 

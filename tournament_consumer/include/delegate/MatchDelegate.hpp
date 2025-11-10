@@ -33,6 +33,8 @@ class MatchDelegate {
     void CreatePlayoffMatches(const std::string& tournamentId);
     std::vector<TeamStanding> CalculateGroupStandings(const std::string& tournamentId, const std::string& groupId);
     bool AllRegularMatchesPlayed(const std::string& tournamentId);
+    bool AllRoundMatchesPlayed(const std::string& tournamentId, domain::Round round);
+    void CreateNextRoundMatches(const std::string& tournamentId, domain::Round currentRound);
 
 public:
     MatchDelegate(const std::shared_ptr<IMatchRepository>& matchRepository,

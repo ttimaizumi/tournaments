@@ -95,38 +95,28 @@ void MatchDelegate::ProcessScoreUpdate(const domain::ScoreUpdateEvent& scoreUpda
                 std::println("Waiting for more regular matches to complete...");
             }
         } else {
-            // This is a playoff match - assign winner to next round
+            // This is a playoff match
             domain::Winner winner = scoreUpdateEvent.score.GetWinner();
-            std::string winnerTeamId = (winner == domain::Winner::HOME) ?
-                updatedMatch->HomeTeamId() : updatedMatch->VisitorTeamId();
             std::string winnerTeamName = (winner == domain::Winner::HOME) ?
                 updatedMatch->HomeTeamName() : updatedMatch->VisitorTeamName();
 
             std::println("Winner of {} match: {}", domain::roundToString(updatedMatch->GetRound()), winnerTeamName);
 
-            // Determine next round based on current round
-            domain::Round nextRound;
-            switch (updatedMatch->GetRound()) {
-                case domain::Round::EIGHTHS:
-                    nextRound = domain::Round::QUARTERS;
-                    break;
-                case domain::Round::QUARTERS:
-                    nextRound = domain::Round::SEMIS;
-                    break;
-                case domain::Round::SEMIS:
-                    nextRound = domain::Round::FINAL;
-                    break;
-                case domain::Round::FINAL:
-                    std::println("Tournament complete! Champion: {}", winnerTeamName);
-                    return;
-                default:
-                    return;
+            // Check if this was the final
+            if (updatedMatch->GetRound() == domain::Round::FINAL) {
+                std::println("Tournament complete! Champion: {}", winnerTeamName);
+                return;
             }
 
-            // Find the next match for this winner
-            // Implementation would depend on bracket structure
-            // For simplicity, we'll just log it
-            std::println("Team {} advances to {}", winnerTeamName, domain::roundToString(nextRound));
+            // Check if all matches in this round are complete
+            if (AllRoundMatchesPlayed(scoreUpdateEvent.tournamentId, updatedMatch->GetRound())) {
+                std::println("All {} matches complete! Creating next round...",
+                             domain::roundToString(updatedMatch->GetRound()));
+                CreateNextRoundMatches(scoreUpdateEvent.tournamentId, updatedMatch->GetRound());
+            } else {
+                std::println("Team {} advances. Waiting for more {} matches to complete...",
+                             winnerTeamName, domain::roundToString(updatedMatch->GetRound()));
+            }
         }
     } catch (const std::exception& e) {
         std::println("Error processing score update: {}", e.what());
@@ -271,4 +261,93 @@ void MatchDelegate::CreatePlayoffMatches(const std::string& tournamentId) {
     }
 
     std::println("Playoff bracket created successfully with {} eighths matches", bracket.size());
+}
+
+bool MatchDelegate::AllRoundMatchesPlayed(const std::string& tournamentId, domain::Round round) {
+    auto matches = matchRepository->FindMatchesByTournamentAndRound(tournamentId, round);
+
+    // Check if all matches have scores
+    for (const auto& match : matches) {
+        if (!match->HasScore()) {
+            return false;
+        }
+    }
+
+    return !matches.empty();
+}
+
+void MatchDelegate::CreateNextRoundMatches(const std::string& tournamentId, domain::Round currentRound) {
+    // Get all completed matches from current round
+    auto currentMatches = matchRepository->FindMatchesByTournamentAndRound(tournamentId, currentRound);
+
+    // Sort matches by ID to ensure consistent bracket pairing
+    std::sort(currentMatches.begin(), currentMatches.end(),
+              [](const auto& a, const auto& b) { return a->Id() < b->Id(); });
+
+    // Determine next round
+    domain::Round nextRound;
+    size_t expectedMatches;
+
+    switch (currentRound) {
+        case domain::Round::EIGHTHS:
+            nextRound = domain::Round::QUARTERS;
+            expectedMatches = 8;
+            break;
+        case domain::Round::QUARTERS:
+            nextRound = domain::Round::SEMIS;
+            expectedMatches = 4;
+            break;
+        case domain::Round::SEMIS:
+            nextRound = domain::Round::FINAL;
+            expectedMatches = 2;
+            break;
+        default:
+            std::println("Cannot create next round after {}", domain::roundToString(currentRound));
+            return;
+    }
+
+    if (currentMatches.size() != expectedMatches) {
+        std::println("Expected {} matches in {}, found {}",
+                     expectedMatches, domain::roundToString(currentRound), currentMatches.size());
+        return;
+    }
+
+    // Create matches by pairing winners: [0,1], [2,3], [4,5], [6,7]
+    for (size_t i = 0; i < currentMatches.size(); i += 2) {
+        auto match1 = currentMatches[i];
+        auto match2 = currentMatches[i + 1];
+
+        if (!match1->HasScore() || !match2->HasScore()) {
+            continue;
+        }
+
+        // Get winners
+        auto winner1 = match1->MatchScore().value().GetWinner();
+        auto winner2 = match2->MatchScore().value().GetWinner();
+
+        std::string homeTeamId = (winner1 == domain::Winner::HOME) ?
+            match1->HomeTeamId() : match1->VisitorTeamId();
+        std::string homeTeamName = (winner1 == domain::Winner::HOME) ?
+            match1->HomeTeamName() : match1->VisitorTeamName();
+
+        std::string visitorTeamId = (winner2 == domain::Winner::HOME) ?
+            match2->HomeTeamId() : match2->VisitorTeamId();
+        std::string visitorTeamName = (winner2 == domain::Winner::HOME) ?
+            match2->HomeTeamName() : match2->VisitorTeamName();
+
+        // Create next round match
+        domain::Match newMatch;
+        newMatch.SetTournamentId(tournamentId);
+        newMatch.SetHomeTeamId(homeTeamId);
+        newMatch.SetHomeTeamName(homeTeamName);
+        newMatch.SetVisitorTeamId(visitorTeamId);
+        newMatch.SetVisitorTeamName(visitorTeamName);
+        newMatch.SetRound(nextRound);
+
+        std::string matchId = matchRepository->Create(newMatch);
+        std::println("Created {} match: {} vs {} (ID: {})",
+                     domain::roundToString(nextRound), homeTeamName, visitorTeamName, matchId);
+    }
+
+    std::println("{} round created successfully", domain::roundToString(nextRound));
 }
