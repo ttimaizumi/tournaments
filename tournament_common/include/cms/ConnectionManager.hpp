@@ -9,14 +9,18 @@
 #include <cms/Session.h>
 #include <activemq/core/ActiveMQConnectionFactory.h>
 #include <memory>
+#include <print>
 
 class ConnectionManager {
 public:
     void initialize(const std::string_view& brokerURI) {
+        std::println("Initializing ConnectionManager with broker: {}", brokerURI);
         factory = std::make_unique<activemq::core::ActiveMQConnectionFactory>(brokerURI.data());
+        std::println("Creating connection...");
         connection = std::shared_ptr<cms::Connection>(factory->createConnection());
-
+        std::println("Starting connection...");
         connection->start();
+        std::println("Connection started successfully");
     }
 
     [[nodiscard]] std::shared_ptr<cms::Connection> Connection() const { return connection; }

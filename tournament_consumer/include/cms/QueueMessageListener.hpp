@@ -39,9 +39,12 @@ inline void QueueMessageListener::Start(const std::string_view& queueName) {
         return;
     this->running = true;
     try {
+        std::println("Attempting to create session...");
         session = connectionManager->CreateSession();
+        std::println("Session created, creating queue: {}", queueName);
         const auto destination = std::unique_ptr<cms::Queue>(session->createQueue(queueName.data()));
         auto consumer = std::unique_ptr<cms::MessageConsumer>(session->createConsumer(destination.get()));
+        std::println("Consumer created successfully, starting message loop...");
 
         while (running) {
             std::unique_ptr<cms::Message> message(consumer->receive(1500));
@@ -52,7 +55,9 @@ inline void QueueMessageListener::Start(const std::string_view& queueName) {
             }
         }
     } catch (const cms::CMSException& e) {
-
+        std::println("CMS Exception in Start: {}", e.getMessage());
+    } catch (const std::exception& e) {
+        std::println("Exception in Start: {}", e.what());
     }
 }
 
