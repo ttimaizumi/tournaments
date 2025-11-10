@@ -5,10 +5,6 @@
 #include "domain/Utilities.hpp"
 #include  "persistence/repository/GroupRepository.hpp"
 
-#include "exception/NotFound.hpp"
-#include "exception/InvalidFormat.hpp"
-#include "exception/Duplicate.hpp"
-
 GroupRepository::GroupRepository(const std::shared_ptr<IDbConnectionProvider>& connectionProvider) : connectionProvider(std::move(connectionProvider)) {}
 
 std::vector<std::shared_ptr<domain::Group>> GroupRepository::FindByTournamentId(const std::string_view& tournamentId) {
