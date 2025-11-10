@@ -3,44 +3,23 @@
 #include <memory>
 #include <nlohmann/json.hpp>
 
-#include "cms/ScoreUpdateListener.hpp"
-#include "delegate/MatchDelegate.hpp"
 #include "event/ScoreUpdateEvent.hpp"
-#include "persistence/repository/IMatchRepository.hpp"
-#include "persistence/repository/GroupRepository.hpp"
-#include "persistence/repository/TournamentRepository.hpp"
+#include "domain/Match.hpp"
 
-// Mock for MatchDelegate
-class MatchDelegateMock : public MatchDelegate {
-public:
-    MatchDelegateMock() : MatchDelegate(nullptr, nullptr, nullptr) {}
-
-    MOCK_METHOD(void, ProcessScoreUpdate, (const domain::ScoreUpdateEvent&), (override));
-};
-
-// We can't easily test ScoreUpdateListener without a real ConnectionManager,
-// so we'll test the processMessage logic through a test fixture
+// Test fixture for ScoreUpdateListener message parsing
 class ScoreUpdateListenerTest : public ::testing::Test {
 protected:
-    std::shared_ptr<MatchDelegateMock> delegateMock;
+    void SetUp() override {}
+    void TearDown() override {}
 
-    void SetUp() override {
-        delegateMock = std::make_shared<MatchDelegateMock>();
-    }
-
-    void TearDown() override {
-        testing::Mock::VerifyAndClearExpectations(delegateMock.get());
-    }
-
-    // Helper to simulate message processing
-    void SimulateMessageProcessing(const std::string& jsonMessage) {
-        domain::ScoreUpdateEvent event = nlohmann::json::parse(jsonMessage);
-        delegateMock->ProcessScoreUpdate(event);
+    // Helper to parse message
+    domain::ScoreUpdateEvent ParseMessage(const std::string& jsonMessage) {
+        return nlohmann::json::parse(jsonMessage).get<domain::ScoreUpdateEvent>();
     }
 };
 
 // Test valid score update message
-TEST_F(ScoreUpdateListenerTest, ProcessMessage_ValidScoreUpdate_CallsDelegate) {
+TEST_F(ScoreUpdateListenerTest, ProcessMessage_ValidScoreUpdate_ParsesCorrectly) {
     nlohmann::json message = {
         {"tournamentId", "tournament-123"},
         {"matchId", "match-456"},
@@ -50,20 +29,16 @@ TEST_F(ScoreUpdateListenerTest, ProcessMessage_ValidScoreUpdate_CallsDelegate) {
         }}
     };
 
-    EXPECT_CALL(*delegateMock, ProcessScoreUpdate(testing::_))
-            .Times(1)
-            .WillOnce(testing::Invoke([](const domain::ScoreUpdateEvent& event) {
-                EXPECT_EQ("tournament-123", event.tournamentId);
-                EXPECT_EQ("match-456", event.matchId);
-                EXPECT_EQ(2, event.score.homeTeamScore);
-                EXPECT_EQ(1, event.score.visitorTeamScore);
-            }));
+    auto event = ParseMessage(message.dump());
 
-    SimulateMessageProcessing(message.dump());
+    EXPECT_EQ("tournament-123", event.tournamentId);
+    EXPECT_EQ("match-456", event.matchId);
+    EXPECT_EQ(2, event.score.homeTeamScore);
+    EXPECT_EQ(1, event.score.visitorTeamScore);
 }
 
 // Test score update with tie
-TEST_F(ScoreUpdateListenerTest, ProcessMessage_TieScore_CallsDelegate) {
+TEST_F(ScoreUpdateListenerTest, ProcessMessage_TieScore_ParsesCorrectly) {
     nlohmann::json message = {
         {"tournamentId", "tournament-123"},
         {"matchId", "match-789"},
@@ -73,19 +48,15 @@ TEST_F(ScoreUpdateListenerTest, ProcessMessage_TieScore_CallsDelegate) {
         }}
     };
 
-    EXPECT_CALL(*delegateMock, ProcessScoreUpdate(testing::_))
-            .Times(1)
-            .WillOnce(testing::Invoke([](const domain::ScoreUpdateEvent& event) {
-                EXPECT_EQ(1, event.score.homeTeamScore);
-                EXPECT_EQ(1, event.score.visitorTeamScore);
-                EXPECT_TRUE(event.score.IsTie());
-            }));
+    auto event = ParseMessage(message.dump());
 
-    SimulateMessageProcessing(message.dump());
+    EXPECT_EQ(1, event.score.homeTeamScore);
+    EXPECT_EQ(1, event.score.visitorTeamScore);
+    EXPECT_TRUE(event.score.IsTie());
 }
 
 // Test score update with zero scores
-TEST_F(ScoreUpdateListenerTest, ProcessMessage_ZeroScores_CallsDelegate) {
+TEST_F(ScoreUpdateListenerTest, ProcessMessage_ZeroScores_ParsesCorrectly) {
     nlohmann::json message = {
         {"tournamentId", "tournament-123"},
         {"matchId", "match-000"},
@@ -95,18 +66,14 @@ TEST_F(ScoreUpdateListenerTest, ProcessMessage_ZeroScores_CallsDelegate) {
         }}
     };
 
-    EXPECT_CALL(*delegateMock, ProcessScoreUpdate(testing::_))
-            .Times(1)
-            .WillOnce(testing::Invoke([](const domain::ScoreUpdateEvent& event) {
-                EXPECT_EQ(0, event.score.homeTeamScore);
-                EXPECT_EQ(0, event.score.visitorTeamScore);
-            }));
+    auto event = ParseMessage(message.dump());
 
-    SimulateMessageProcessing(message.dump());
+    EXPECT_EQ(0, event.score.homeTeamScore);
+    EXPECT_EQ(0, event.score.visitorTeamScore);
 }
 
 // Test score update with high scores
-TEST_F(ScoreUpdateListenerTest, ProcessMessage_HighScores_CallsDelegate) {
+TEST_F(ScoreUpdateListenerTest, ProcessMessage_HighScores_ParsesCorrectly) {
     nlohmann::json message = {
         {"tournamentId", "tournament-123"},
         {"matchId", "match-high"},
@@ -116,15 +83,11 @@ TEST_F(ScoreUpdateListenerTest, ProcessMessage_HighScores_CallsDelegate) {
         }}
     };
 
-    EXPECT_CALL(*delegateMock, ProcessScoreUpdate(testing::_))
-            .Times(1)
-            .WillOnce(testing::Invoke([](const domain::ScoreUpdateEvent& event) {
-                EXPECT_EQ(7, event.score.homeTeamScore);
-                EXPECT_EQ(5, event.score.visitorTeamScore);
-                EXPECT_EQ(domain::Winner::HOME, event.score.GetWinner());
-            }));
+    auto event = ParseMessage(message.dump());
 
-    SimulateMessageProcessing(message.dump());
+    EXPECT_EQ(7, event.score.homeTeamScore);
+    EXPECT_EQ(5, event.score.visitorTeamScore);
+    EXPECT_EQ(domain::Winner::HOME, event.score.GetWinner());
 }
 
 // Test winner detection
@@ -138,14 +101,10 @@ TEST_F(ScoreUpdateListenerTest, ProcessMessage_HomeWins_CorrectWinnerDetected) {
         }}
     };
 
-    EXPECT_CALL(*delegateMock, ProcessScoreUpdate(testing::_))
-            .Times(1)
-            .WillOnce(testing::Invoke([](const domain::ScoreUpdateEvent& event) {
-                EXPECT_EQ(domain::Winner::HOME, event.score.GetWinner());
-                EXPECT_FALSE(event.score.IsTie());
-            }));
+    auto event = ParseMessage(message.dump());
 
-    SimulateMessageProcessing(message.dump());
+    EXPECT_EQ(domain::Winner::HOME, event.score.GetWinner());
+    EXPECT_FALSE(event.score.IsTie());
 }
 
 TEST_F(ScoreUpdateListenerTest, ProcessMessage_VisitorWins_CorrectWinnerDetected) {
@@ -158,14 +117,10 @@ TEST_F(ScoreUpdateListenerTest, ProcessMessage_VisitorWins_CorrectWinnerDetected
         }}
     };
 
-    EXPECT_CALL(*delegateMock, ProcessScoreUpdate(testing::_))
-            .Times(1)
-            .WillOnce(testing::Invoke([](const domain::ScoreUpdateEvent& event) {
-                EXPECT_EQ(domain::Winner::VISITOR, event.score.GetWinner());
-                EXPECT_FALSE(event.score.IsTie());
-            }));
+    auto event = ParseMessage(message.dump());
 
-    SimulateMessageProcessing(message.dump());
+    EXPECT_EQ(domain::Winner::VISITOR, event.score.GetWinner());
+    EXPECT_FALSE(event.score.IsTie());
 }
 
 // Test invalid JSON handling (should throw and be handled by listener)

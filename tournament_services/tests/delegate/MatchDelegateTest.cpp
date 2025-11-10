@@ -4,7 +4,7 @@
 
 #include "domain/Match.hpp"
 #include "persistence/repository/IMatchRepository.hpp"
-#include "queue/IQueueMessageProducer.hpp"
+#include "cms/IQueueMessageProducer.hpp"
 #include "delegate/MatchDelegate.hpp"
 
 class MatchRepositoryMock : public IMatchRepository {
