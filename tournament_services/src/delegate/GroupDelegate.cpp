@@ -3,6 +3,7 @@
 #include "persistence/repository/TournamentRepository.hpp"
 #include <utility>
 #include <format>
+#include <nlohmann/json.hpp>
 
 GroupDelegate::GroupDelegate(
     const std::shared_ptr<IRepository<domain::Tournament, std::string>>& tournamentRepository,
@@ -35,8 +36,14 @@ GroupDelegate::CreateGroup(const std::string_view& tournamentId, const domain::G
     try {
         auto id = groupRepository->Create(g);
 
-        for (const auto& team : g.Teams())
-            producer->SendMessage(std::format("{}:{}:{}", tournamentId, id, team.Id), "team.added.to.group");
+        for (const auto& team : g.Teams()) {
+            nlohmann::json message = {
+                {"tournamentId", std::string(tournamentId)},
+                {"groupId", id},
+                {"teamId", team.Id}
+            };
+            producer->SendMessage(message.dump(), "tournament.team-add");
+        }
 
         return id;
     } catch (const std::exception& e) {
@@ -128,8 +135,13 @@ GroupDelegate::UpdateTeams(
             return std::unexpected(std::format("Team {} doesn't exist", team.Id));
 
         groupRepository->UpdateGroupAddTeam(groupId, persistedTeam);
-        producer->SendMessage(std::format("{}:{}:{}", tournamentId, groupId, team.Id),
-                              "team.added.to.group");
+
+        nlohmann::json message = {
+            {"tournamentId", std::string(tournamentId)},
+            {"groupId", std::string(groupId)},
+            {"teamId", team.Id}
+        };
+        producer->SendMessage(message.dump(), "tournament.team-add");
     }
 
     return {};
