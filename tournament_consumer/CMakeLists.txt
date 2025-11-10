@@ -2,6 +2,7 @@ project(tournament_consumer)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CONSUMER_SOURCES
+        src/delegate/MatchDelegate.cpp
 )
 
 find_package(libpqxx CONFIG REQUIRED)
