@@ -92,7 +92,8 @@ crow::response MatchController::updateMatchScore(const crow::request& request, c
             return crow::response{crow::NOT_FOUND, error};
         } else if(error.find("not allowed") != std::string::npos ||
                   error.find("invalid") != std::string::npos ||
-                  error.find("Tie") != std::string::npos) {
+                  error.find("Tie") != std::string::npos ||
+                  error.find("non-negative") != std::string::npos) {
             return crow::response{422, error};
         } else {
             return crow::response{crow::INTERNAL_SERVER_ERROR, error};

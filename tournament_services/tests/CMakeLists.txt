@@ -12,28 +12,25 @@ include_directories(../include)
 find_package(GTest CONFIG REQUIRED)
 include(GoogleTest)
 
-# Macro to create one test target per file
-function(add_tournament_test name)
-    add_executable(${name}_runner
-            ${ARGN}
-            ../src/controller/GroupController.cpp
-            ../src/controller/TeamController.cpp
-            ../src/controller/TournamentController.cpp
-            ../src/controller/MatchController.cpp
-            ../src/delegate/GroupDelegate.cpp
-            ../src/delegate/TeamDelegate.cpp
-            ../src/delegate/TournamentDelegate.cpp
-            ../src/delegate/MatchDelegate.cpp
-    )
-    target_link_libraries(${name}_runner PRIVATE ${TEST_COMMON_LIBS})
-    gtest_discover_tests(${name}_runner)
-endfunction()
+# Single test executable with all test files
+add_executable(tournament_services_tests
+        controller/GroupControllerTest.cpp
+        controller/TeamControllerTest.cpp
+        controller/TournamentControllerTest.cpp
+        controller/MatchControllerTest.cpp
+        delegate/GroupDelegateTest.cpp
+        delegate/TeamDelegateTest.cpp
+        delegate/TournamentDelegateTest.cpp
+        delegate/MatchDelegateTest.cpp
+        ../src/controller/GroupController.cpp
+        ../src/controller/TeamController.cpp
+        ../src/controller/TournamentController.cpp
+        ../src/controller/MatchController.cpp
+        ../src/delegate/GroupDelegate.cpp
+        ../src/delegate/TeamDelegate.cpp
+        ../src/delegate/TournamentDelegate.cpp
+        ../src/delegate/MatchDelegate.cpp
+)
 
-# Individual test files
-add_tournament_test(group_controller_test controller/GroupControllerTest.cpp)
-add_tournament_test(team_controller_test controller/TeamControllerTest.cpp)
-add_tournament_test(tournament_controller_test controller/TournamentControllerTest.cpp)
-add_tournament_test(match_controller_test controller/MatchControllerTest.cpp)
-add_tournament_test(group_delegate_test delegate/GroupDelegateTest.cpp)
-add_tournament_test(team_delegate_test delegate/TeamDelegateTest.cpp)
-add_tournament_test(tournament_delegate_test delegate/TournamentDelegateTest.cpp)
+target_link_libraries(tournament_services_tests PRIVATE ${TEST_COMMON_LIBS})
+gtest_discover_tests(tournament_services_tests)

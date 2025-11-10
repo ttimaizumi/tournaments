@@ -32,3 +32,8 @@ configure_file(
         ${CMAKE_BINARY_DIR}/${PROJECT_NAME}/configuration.json  # destination
         COPYONLY
 )
+
+# Add tests subdirectory
+if(BUILD_TESTING)
+    add_subdirectory(tests)
+endif()

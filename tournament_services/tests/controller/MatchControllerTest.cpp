@@ -244,3 +244,35 @@ TEST_F(MatchControllerTest, UpdateMatchScore_TieInPlayoffs_Returns422) {
 
     EXPECT_EQ(422, response.code);
 }
+
+TEST_F(MatchControllerTest, UpdateMatchScore_NegativeScores_Returns422) {
+    EXPECT_CALL(*matchDelegateMock, UpdateMatchScore(testing::Eq(std::string("tournament-1")),
+                                                       testing::Eq(std::string("match-1")),
+                                                       testing::_))
+            .WillOnce(testing::Return(std::unexpected("Score values must be non-negative")));
+
+    crow::request req;
+    req.body = R"({"score": {"home": -1, "visitor": 2}})";
+
+    crow::response response = matchController->updateMatchScore(req, "tournament-1", "match-1");
+
+    EXPECT_EQ(422, response.code);
+}
+
+TEST_F(MatchControllerTest, UpdateMatchScore_InvalidJSON_Returns400) {
+    crow::request req;
+    req.body = R"({"score": {"home": 1, "visitor":})";
+
+    crow::response response = matchController->updateMatchScore(req, "tournament-1", "match-1");
+
+    EXPECT_EQ(crow::BAD_REQUEST, response.code);
+}
+
+TEST_F(MatchControllerTest, UpdateMatchScore_MissingScoreField_Returns400) {
+    crow::request req;
+    req.body = R"({"data": {"home": 1, "visitor": 2}})";
+
+    crow::response response = matchController->updateMatchScore(req, "tournament-1", "match-1");
+
+    EXPECT_EQ(crow::BAD_REQUEST, response.code);
+}
