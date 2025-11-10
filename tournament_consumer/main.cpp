@@ -13,14 +13,18 @@ int main() {
         const auto container = config::containerSetup();
         std::println("after container");
 
-        std::thread tournamentCreatedThread([&] {
+        std::thread teamAddThread([&] {
             auto listener = container->resolve<GroupAddTeamListener>();
             listener->Start("tournament.team-add");
         });
-        //crear otro thread aqui
 
-        tournamentCreatedThread.join();
-        //join de otro thread aqui
+        std::thread scoreUpdateThread([&] {
+            auto listener = container->resolve<ScoreUpdateListener>();
+            listener->Start("tournament.score-update");
+        });
+
+        teamAddThread.join();
+        scoreUpdateThread.join();
         // while (true) {
         //     std::this_thread::sleep_for(std::chrono::seconds(5));
         // }

@@ -1,22 +1,31 @@
-#ifndef A251C297_DF53_4BEB_93D6_DB45EAC8C825
-#define A251C297_DF53_4BEB_93D6_DB45EAC8C825
+#ifndef RESTAPI_MATCHDELEGATE_HPP
+#define RESTAPI_MATCHDELEGATE_HPP
 
-class MatchDelegate
-{
-private:
-    /* data */
+#include <memory>
+#include <expected>
+#include <string>
+
+#include "persistence/repository/IMatchRepository.hpp"
+#include "cms/IQueueMessageProducer.hpp"
+#include "domain/Match.hpp"
+#include "IMatchDelegate.hpp"
+
+class MatchDelegate : public IMatchDelegate {
+    std::shared_ptr<IMatchRepository> matchRepository;
+    std::shared_ptr<IQueueMessageProducer> queueMessageProducer;
+
 public:
-    MatchDelegate(/* args */);
-    ~MatchDelegate();
+    explicit MatchDelegate(std::shared_ptr<IMatchRepository> repository,
+                          std::shared_ptr<IQueueMessageProducer> queueProducer);
+
+    std::expected<std::shared_ptr<domain::Match>, std::string>
+        GetMatch(std::string_view tournamentId, std::string_view matchId) override;
+
+    std::expected<std::vector<std::shared_ptr<domain::Match>>, std::string>
+        GetMatches(std::string_view tournamentId, std::string_view filter) override;
+
+    std::expected<void, std::string>
+        UpdateMatchScore(std::string_view tournamentId, std::string_view matchId, const domain::Score& score) override;
 };
 
-MatchDelegate::MatchDelegate(/* args */)
-{
-}
-
-MatchDelegate::~MatchDelegate()
-{
-}
-
-
-#endif /* A251C297_DF53_4BEB_93D6_DB45EAC8C825 */
+#endif //RESTAPI_MATCHDELEGATE_HPP

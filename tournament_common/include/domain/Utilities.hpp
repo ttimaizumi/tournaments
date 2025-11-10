@@ -159,6 +159,112 @@ namespace domain {
         };
     }
 
+    // Round serialization
+    inline std::string roundToString(Round round) {
+        switch (round) {
+            case Round::REGULAR: return "regular";
+            case Round::EIGHTHS: return "eighths";
+            case Round::QUARTERS: return "quarters";
+            case Round::SEMIS: return "semis";
+            case Round::FINAL: return "final";
+            default: return "regular";
+        }
+    }
+
+    inline Round roundFromString(const std::string& str) {
+        if (str == "eighths") return Round::EIGHTHS;
+        if (str == "quarters") return Round::QUARTERS;
+        if (str == "semis") return Round::SEMIS;
+        if (str == "final") return Round::FINAL;
+        return Round::REGULAR;
+    }
+
+    // Score serialization
+    inline void to_json(nlohmann::json& json, const Score& score) {
+        json = nlohmann::json{
+            {"home", score.homeTeamScore},
+            {"visitor", score.visitorTeamScore}
+        };
+    }
+
+    inline void from_json(const nlohmann::json& json, Score& score) {
+        json.at("home").get_to(score.homeTeamScore);
+        json.at("visitor").get_to(score.visitorTeamScore);
+    }
+
+    // Match serialization
+    inline void to_json(nlohmann::json& json, const Match& match) {
+        json = nlohmann::json{
+            {"home", {
+                {"id", match.HomeTeamId()},
+                {"name", match.HomeTeamName()}
+            }},
+            {"visitor", {
+                {"id", match.VisitorTeamId()},
+                {"name", match.VisitorTeamName()}
+            }},
+            {"round", roundToString(match.GetRound())}
+        };
+
+        if (!match.Id().empty()) {
+            json["id"] = match.Id();
+        }
+
+        if (match.HasScore()) {
+            json["score"] = match.MatchScore().value();
+        }
+    }
+
+    inline void to_json(nlohmann::json& json, const std::shared_ptr<Match>& match) {
+        if (match) {
+            to_json(json, *match);
+        }
+    }
+
+    inline void from_json(const nlohmann::json& json, Match& match) {
+        if (json.contains("id")) {
+            match.SetId(json["id"].get<std::string>());
+        }
+
+        if (json.contains("tournamentId")) {
+            match.SetTournamentId(json["tournamentId"].get<std::string>());
+        }
+
+        if (json.contains("home")) {
+            auto home = json["home"];
+            if (home.contains("id"))
+                match.SetHomeTeamId(home["id"].get<std::string>());
+            if (home.contains("name"))
+                match.SetHomeTeamName(home["name"].get<std::string>());
+        }
+
+        if (json.contains("visitor")) {
+            auto visitor = json["visitor"];
+            if (visitor.contains("id"))
+                match.SetVisitorTeamId(visitor["id"].get<std::string>());
+            if (visitor.contains("name"))
+                match.SetVisitorTeamName(visitor["name"].get<std::string>());
+        }
+
+        if (json.contains("round")) {
+            match.SetRound(roundFromString(json["round"].get<std::string>()));
+        }
+
+        if (json.contains("score")) {
+            Score score = json["score"].get<Score>();
+            match.SetScore(score);
+        }
+    }
+
+    inline void to_json(nlohmann::json& json, const std::vector<std::shared_ptr<Match>>& matches) {
+        json = nlohmann::json::array();
+        for (const auto& match : matches) {
+            nlohmann::json matchJson;
+            to_json(matchJson, match);
+            json.push_back(matchJson);
+        }
+    }
+
 }
 
 #endif /* FC7CD637_41CC_48DE_8D8A_BC2CFC528D72 */

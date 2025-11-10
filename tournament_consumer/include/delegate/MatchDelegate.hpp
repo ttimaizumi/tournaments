@@ -7,32 +7,40 @@
 
 #include <memory>
 #include <print>
+#include <vector>
+#include <algorithm>
 
 #include "event/TeamAddEvent.hpp"
+#include "event/ScoreUpdateEvent.hpp"
 #include "persistence/repository/GroupRepository.hpp"
 #include "persistence/repository/IMatchRepository.hpp"
+#include "persistence/repository/TournamentRepository.hpp"
+#include "domain/Match.hpp"
 
 class MatchDelegate {
     std::shared_ptr<IMatchRepository> matchRepository;
     std::shared_ptr<GroupRepository> groupRepository;
+    std::shared_ptr<TournamentRepository> tournamentRepository;
+
+    struct TeamStanding {
+        std::string teamId;
+        std::string teamName;
+        int points = 0;
+        int goalDifference = 0;
+    };
+
+    void CreateRegularMatchesForGroup(const std::string& tournamentId, const std::string& groupId, const std::vector<domain::Team>& teams);
+    void CreatePlayoffMatches(const std::string& tournamentId);
+    std::vector<TeamStanding> CalculateGroupStandings(const std::string& tournamentId, const std::string& groupId);
+    bool AllRegularMatchesPlayed(const std::string& tournamentId);
+
 public:
-    MatchDelegate(const std::shared_ptr<IMatchRepository>& matchRepository, const std::shared_ptr<GroupRepository>& groupRepository);
+    MatchDelegate(const std::shared_ptr<IMatchRepository>& matchRepository,
+                  const std::shared_ptr<GroupRepository>& groupRepository,
+                  const std::shared_ptr<TournamentRepository>& tournamentRepository);
+
     void ProcessTeamAddition(const domain::TeamAddEvent& teamAddEvent);
+    void ProcessScoreUpdate(const domain::ScoreUpdateEvent& scoreUpdateEvent);
 };
-
-inline MatchDelegate::MatchDelegate(const std::shared_ptr<IMatchRepository> &matchRepository, const std::shared_ptr<GroupRepository> &groupRepository)
-: matchRepository(matchRepository), groupRepository(groupRepository) {}
-
-inline void MatchDelegate::ProcessTeamAddition(const domain::TeamAddEvent& teamAddEvent) {
-    auto group = groupRepository->FindByTournamentIdAndGroupId(teamAddEvent.tournamentId, teamAddEvent.groupId);
-    //If tournament has all teams and all matches are created?
-    //then create matches
-    if (group != nullptr && group->Teams().size() == 32) {
-        std::println("creating matches for {}", teamAddEvent.tournamentId, group->Teams().size());
-    }
-    std::println("{} wait for teams, current teams: {}", teamAddEvent.tournamentId, group->Teams().size());
-    std::cout << "This appears in docker logs" << std::endl;
-    //else move on
-}
 
 #endif //CONSUMER_MATCHDELEGATE_HPP

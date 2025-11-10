@@ -19,9 +19,11 @@ function(add_tournament_test name)
             ../src/controller/GroupController.cpp
             ../src/controller/TeamController.cpp
             ../src/controller/TournamentController.cpp
+            ../src/controller/MatchController.cpp
             ../src/delegate/GroupDelegate.cpp
             ../src/delegate/TeamDelegate.cpp
             ../src/delegate/TournamentDelegate.cpp
+            ../src/delegate/MatchDelegate.cpp
     )
     target_link_libraries(${name}_runner PRIVATE ${TEST_COMMON_LIBS})
     gtest_discover_tests(${name}_runner)
@@ -31,6 +33,7 @@ endfunction()
 add_tournament_test(group_controller_test controller/GroupControllerTest.cpp)
 add_tournament_test(team_controller_test controller/TeamControllerTest.cpp)
 add_tournament_test(tournament_controller_test controller/TournamentControllerTest.cpp)
+add_tournament_test(match_controller_test controller/MatchControllerTest.cpp)
 add_tournament_test(group_delegate_test delegate/GroupDelegateTest.cpp)
 add_tournament_test(team_delegate_test delegate/TeamDelegateTest.cpp)
 add_tournament_test(tournament_delegate_test delegate/TournamentDelegateTest.cpp)

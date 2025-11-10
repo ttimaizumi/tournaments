@@ -22,11 +22,15 @@
 #include "persistence/configuration/PostgresConnectionProvider.hpp"
 #include "persistence/repository/TournamentRepository.hpp"
 #include "persistence/repository/GroupRepository.hpp"
+#include "persistence/repository/MatchRepository.hpp"
 #include "cms/QueueMessageProducer.hpp"
 #include "cms/QueueResolver.hpp"
 #include "delegate/IGroupDelegate.hpp"
 #include "../delegate/GroupDelegate.hpp"
 #include "controller/GroupController.hpp"
+#include "delegate/IMatchDelegate.hpp"
+#include "delegate/MatchDelegate.hpp"
+#include "controller/MatchController.hpp"
 
 namespace config {
     inline std::shared_ptr<Hypodermic::Container> containerSetup() {
@@ -55,6 +59,7 @@ namespace config {
 
         builder.registerType<TeamRepository>().as<IRepository<domain::Team, std::string_view> >().singleInstance();
         builder.registerType<GroupRepository>().as<IGroupRepository>().singleInstance();
+        builder.registerType<MatchRepository>().as<IMatchRepository>().singleInstance();
 
         builder.registerType<TeamDelegate>().as<ITeamDelegate>().singleInstance();
         builder.registerType<TeamController>().singleInstance();
@@ -73,6 +78,14 @@ namespace config {
             })
             .singleInstance();
         builder.registerType<GroupController>().singleInstance();
+
+        builder.registerType<MatchDelegate>().as<IMatchDelegate>()
+            .with<IQueueMessageProducer>([](Hypodermic::ComponentContext& context){
+                return context.resolveNamed<QueueMessageProducer>("tournamentAddTeamQueue");
+            })
+            .singleInstance();
+        builder.registerType<MatchController>().singleInstance();
+
         builder.registerType<HealthController>().singleInstance();
 
         return builder.build();
