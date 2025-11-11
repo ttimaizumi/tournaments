@@ -7,12 +7,14 @@ set(TEST_SOURCES
         delegate/TeamDelegateTest.cpp
         delegate/TournamentDelegateTest.cpp
         delegate/GroupDelegateTest.cpp
+        delegate/BracketGeneratorTest.cpp
         ../src/controller/TeamController.cpp
         ../src/controller/TournamentController.cpp
         ../src/controller/GroupController.cpp
         ../src/delegate/TeamDelegate.cpp
         ../src/delegate/TournamentDelegate.cpp
         ../src/delegate/GroupDelegate.cpp
+        ../src/delegate/BracketGenerator.cpp
 )
 
 set(SOURCES ${TEST_SOURCES})
