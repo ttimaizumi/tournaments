@@ -32,8 +32,8 @@ public:
 class GroupRepositoryMock : public GroupRepository {
 public:
     GroupRepositoryMock() : GroupRepository(nullptr) {}
-    MOCK_METHOD(std::shared_ptr<domain::Group>, FindByTournamentIdAndGroupId, (std::string_view, std::string_view), (override));
-    MOCK_METHOD(std::vector<std::shared_ptr<domain::Group>>, FindByTournamentId, (std::string_view), (override));
+    MOCK_METHOD(std::shared_ptr<domain::Group>, FindByTournamentIdAndGroupId, (const std::string_view&, const std::string_view&), (override));
+    MOCK_METHOD(std::vector<std::shared_ptr<domain::Group>>, FindByTournamentId, (const std::string_view&), (override));
 };
 
 class TournamentRepositoryMock : public TournamentRepository {
@@ -68,7 +68,6 @@ TEST_F(ConsumerMatchDelegateTest, ProcessTeamAddition_GroupWith4Teams_CreatesMat
     event.tournamentId = "tournament-1";
     event.groupId = "group-A";
     event.teamId = "team-4";
-    event.teamName = "Team D";
 
     auto group = std::make_shared<domain::Group>();
     group->SetId("group-A");
@@ -103,7 +102,6 @@ TEST_F(ConsumerMatchDelegateTest, ProcessTeamAddition_GroupWith3Teams_DoesNotCre
     event.tournamentId = "tournament-1";
     event.groupId = "group-A";
     event.teamId = "team-3";
-    event.teamName = "Team C";
 
     auto group = std::make_shared<domain::Group>();
     group->SetId("group-A");
