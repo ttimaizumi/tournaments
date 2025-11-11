@@ -9,14 +9,16 @@
 #include "exception/Error.hpp"
 #include "domain/Constants.hpp"
 
-MatchDelegate::MatchDelegate(const std::shared_ptr<IMatchRepository>& matchRepository)
-    : matchRepository(matchRepository) {}
+MatchDelegate::MatchDelegate(const std::shared_ptr<IMatchRepository>& matchRepository, const std::shared_ptr<TournamentRepository>& tournamentRepository)
+    : matchRepository(matchRepository), tournamentRepository(tournamentRepository) {}
 
 std::expected<std::vector<std::shared_ptr<domain::Match>>, Error> MatchDelegate::GetMatches(std::string_view tournamentId) {
     if (!std::regex_match(std::string{tournamentId}, ID_VALUE)) {
         return std::unexpected(Error::INVALID_FORMAT);
     }
-    std::cout << "Attempting to get matches for tournament ID: " + std::string(tournamentId) + "\n" ;
+    if (!tournamentRepository->ReadById(tournamentId.data())) {
+        return std::unexpected(Error::NOT_FOUND);
+    }
     return matchRepository->FindByTournamentId(tournamentId);
 }
 
@@ -25,9 +27,28 @@ std::expected<std::shared_ptr<domain::Match>, Error> MatchDelegate::GetMatch(std
         !std::regex_match(std::string{matchId}, ID_VALUE)) {
         return std::unexpected(Error::INVALID_FORMAT);
     }
+    if (!tournamentRepository->ReadById(tournamentId.data())) {
+        return std::unexpected(Error::NOT_FOUND);
+    }
     return matchRepository->FindByTournamentIdAndMatchId(tournamentId, matchId);
 }
 
 std::expected<std::string, Error> MatchDelegate::UpdateMatchScore(const domain::Match& match) {
-    return "";
+  if (!std::regex_match(std::string{match.TournamentId()}, ID_VALUE) ||
+    !std::regex_match(std::string{match.Id()}, ID_VALUE)) {
+    return std::unexpected(Error::INVALID_FORMAT);
+  }
+
+  auto existingMatch = matchRepository->FindByTournamentIdAndMatchId(match.TournamentId(), match.Id());
+  if (!existingMatch) {
+    return std::unexpected(Error::NOT_FOUND);
+  }
+
+  const auto& score = match.MatchScore();
+  if (score.homeTeamScore < 0 || score.visitorTeamScore < 0) {
+    return std::unexpected(Error::INVALID_FORMAT);
+  }
+
+  matchRepository->UpdateMatchScore(match.Id(), score);
+  return std::string{match.Id()};
 }

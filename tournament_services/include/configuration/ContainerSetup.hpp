@@ -28,6 +28,11 @@
 #include "delegate/GroupDelegate.hpp"
 #include "controller/GroupController.hpp"
 #include "delegate/ITournamentDelegate.hpp"
+#include "delegate/IMatchDelegate.hpp"
+#include "delegate/MatchDelegate.hpp"
+#include "persistence/repository/IMatchRepository.hpp"
+#include "persistence/repository/MatchRepository.hpp"
+#include "controller/MatchController.hpp"
 
 namespace config {
     inline std::shared_ptr<Hypodermic::Container> containerSetup() {
@@ -75,6 +80,10 @@ namespace config {
             .singleInstance();
         builder.registerType<GroupController>().singleInstance();
         builder.registerType<HealthController>().singleInstance();
+
+        builder.registerType<MatchRepository>().as<IMatchRepository>().singleInstance();
+        builder.registerType<MatchDelegate>().as<IMatchDelegate>().singleInstance();
+        builder.registerType<MatchController>().singleInstance();
 
         return builder.build();
     }
