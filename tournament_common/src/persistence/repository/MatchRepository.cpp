@@ -23,49 +23,6 @@ std::vector<std::shared_ptr<domain::Match>> MatchRepository::FindByTournamentId(
     return matches;
 }
 
-std::shared_ptr<domain::Match> MatchRepository::ReadById(std::string id) {
-    return std::make_shared<domain::Match>();
-}
-
-std::string MatchRepository::Create (const domain::Match & entity) {
-    auto pooled = connectionProvider->Connection();
-    auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
-    nlohmann::json matchBody = entity;
-
-    pqxx::work tx(*(connection->connection));
-    pqxx::result result = tx.exec(pqxx::prepped{"insert_match"}, pqxx::params{entity.TournamentId(), matchBody.dump()});
-    tx.commit();
-    
-    return result[0]["id"].c_str();
-}
-
-std::string MatchRepository::Update (const domain::Match & entity) {
-    auto pooled = connectionProvider->Connection();
-    auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
-    nlohmann::json matchBody = entity;
-
-    pqxx::work tx(*(connection->connection));
-    pqxx::result result = tx.exec(pqxx::prepped{"update_match"}, pqxx::params{entity.Id(), matchBody.dump()});
-
-    tx.commit();
-
-    return entity.Id();
-}
-
-void MatchRepository::Delete(std::string id) {
-    auto pooled = connectionProvider->Connection();
-    auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
-
-    pqxx::work tx(*(connection->connection));
-    pqxx::result result = tx.exec(pqxx::prepped{"delete_match"}, pqxx::params{id});
-
-    tx.commit();
-}
-
-std::vector<std::shared_ptr<domain::Match>> MatchRepository::ReadAll() {
-    return std::vector<std::shared_ptr<domain::Match>>();
-}
-
 std::shared_ptr<domain::Match> MatchRepository::FindByTournamentIdAndMatchId(const std::string_view& tournamentId, const std::string_view& matchId) {
     auto pooled = connectionProvider->Connection();
     auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
@@ -91,4 +48,31 @@ void MatchRepository::UpdateMatchScore(const std::string_view& matchId, const do
     pqxx::work tx(*(connection->connection));
     const pqxx::result result = tx.exec(pqxx::prepped{"update_match_score"}, pqxx::params{matchId.data(), scoreDocument.dump()});
     tx.commit();
+}
+
+std::vector<std::string> MatchRepository::CreateBulk(const std::vector<domain::Match>& matches) {
+    auto pooled = connectionProvider->Connection();
+    const auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
+
+    pqxx::work tx(*(connection->connection));
+    std::vector<std::string> createdIds;
+    for (const auto& match : matches) {
+        nlohmann::json matchDocument = match;
+        const pqxx::result result = tx.exec(pqxx::prepped{"insert_match"}, pqxx::params{match.TournamentId().data(),
+                                                                                      matchDocument.dump()});
+        createdIds.push_back(result[0]["id"].c_str());
+    }
+    tx.commit();
+    return createdIds;
+}
+
+bool MatchRepository::MatchesExistForTournament(const std::string_view& tournamentId) {
+    auto pooled = connectionProvider->Connection();
+    const auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
+
+    pqxx::work tx(*(connection->connection));
+    const pqxx::result result = tx.exec(pqxx::prepped{"select_matches_by_tournament"}, pqxx::params{tournamentId.data()});
+    tx.commit();
+
+    return !result.empty();
 }

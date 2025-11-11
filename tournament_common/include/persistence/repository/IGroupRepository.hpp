@@ -11,6 +11,7 @@
 
 class IGroupRepository : public IRepository<domain::Group, std::string> {
 public:
+    virtual ~IGroupRepository() = default;
     virtual std::vector<std::shared_ptr<domain::Group>> FindByTournamentId(const std::string_view& tournamentId) = 0;
     virtual std::shared_ptr<domain::Group> FindByTournamentIdAndGroupId(const std::string_view& tournamentId, const std::string_view& groupId) = 0;
     virtual std::shared_ptr<domain::Group> FindByTournamentIdAndTeamId(const std::string_view& tournamentId, const std::string_view& teamId) = 0;
