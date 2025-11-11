@@ -50,6 +50,7 @@ CREATE UNIQUE INDEX tournament_group_unique_name_idx ON GROUPS (tournament_id,(d
 
 CREATE TABLE MATCHES (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    TOURNAMENT_ID UUID not null references TOURNAMENTS(ID),
     document JSONB NOT NULL,
     last_update_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
