@@ -43,12 +43,10 @@ namespace domain {
     }
 
     inline TournamentType fromString(std::string_view type) {
-        if (type == "ROUND_ROBIN")
-            return TournamentType::ROUND_ROBIN;
-        if (type == "NFL")
-            return TournamentType::NFL;
+        if (type == "DOUBLE_ELIMINATION")
+            return TournamentType::DOUBLE_ELIMINATION;
 
-        return TournamentType::ROUND_ROBIN;
+        return TournamentType::DOUBLE_ELIMINATION;
     }
 
     inline void from_json(const nlohmann::json& json, TournamentFormat& format) {
@@ -63,14 +61,11 @@ namespace domain {
     inline void to_json(nlohmann::json& json, const TournamentFormat& format) {
         json = {{"maxTeamsPerGroup", format.MaxTeamsPerGroup()}, {"numberOfGroups", format.NumberOfGroups()}};
         switch (format.Type()) {
-            case TournamentType::ROUND_ROBIN:
-                json["type"] = "ROUND_ROBIN";
-                break;
-            case TournamentType::NFL:
-                json["type"] = "NFL";
+            case TournamentType::DOUBLE_ELIMINATION:
+                json["type"] = "DOUBLE_ELIMINATION";
                 break;
             default:
-                json["type"] = "ROUND_ROBIN";
+                json["type"] = "DOUBLE_ELIMINATION";
         }
     }
 
@@ -151,6 +146,130 @@ namespace domain {
             json["id"] = group.Id();
         }
         json["teams"] = group.Teams();
+    }
+
+    inline std::string bracketTypeToString(BracketType type) {
+        switch (type) {
+            case BracketType::WINNERS: return "WINNERS";
+            case BracketType::LOSERS: return "LOSERS";
+            case BracketType::FINAL: return "FINAL";
+            default: return "WINNERS";
+        }
+    }
+
+    inline BracketType bracketTypeFromString(std::string_view type) {
+        if (type == "WINNERS") return BracketType::WINNERS;
+        if (type == "LOSERS") return BracketType::LOSERS;
+        if (type == "FINAL") return BracketType::FINAL;
+        return BracketType::WINNERS;
+    }
+
+    inline void to_json(nlohmann::json& json, const Score& score) {
+        json = {
+            {"homeTeamScore", score.homeTeamScore},
+            {"visitorTeamScore", score.visitorTeamScore}
+        };
+    }
+
+    inline void from_json(const nlohmann::json& json, Score& score) {
+        if (json.contains("homeTeamScore"))
+            json.at("homeTeamScore").get_to(score.homeTeamScore);
+        if (json.contains("visitorTeamScore"))
+            json.at("visitorTeamScore").get_to(score.visitorTeamScore);
+    }
+
+    inline void to_json(nlohmann::json& json, const Match& match) {
+        json = nlohmann::json::object();
+        if (!match.Id().empty()) {
+            json["id"] = match.Id();
+        }
+        if (!match.TournamentId().empty()) {
+            json["tournamentId"] = match.TournamentId();
+        }
+        if (!match.HomeTeamId().empty()) {
+            json["homeTeamId"] = match.HomeTeamId();
+        }
+        if (!match.VisitorTeamId().empty()) {
+            json["visitorTeamId"] = match.VisitorTeamId();
+        }
+        json["score"] = match.MatchScore();
+        if (!match.WinnerNextMatchId().empty()) {
+            json["winnerNextMatchId"] = match.WinnerNextMatchId();
+        }
+        if (!match.LoserNextMatchId().empty()) {
+            json["loserNextMatchId"] = match.LoserNextMatchId();
+        }
+        json["roundNumber"] = match.RoundNumber();
+        json["bracketType"] = bracketTypeToString(match.Bracket());
+        json["isFirstFinal"] = match.IsFirstFinal();
+    }
+
+    inline void from_json(const nlohmann::json& json, Match& match) {
+        if (json.contains("id")) {
+            match.Id() = json["id"].get<std::string>();
+        }
+        if (json.contains("tournamentId")) {
+            match.TournamentId() = json["tournamentId"].get<std::string>();
+        }
+        if (json.contains("homeTeamId")) {
+            match.HomeTeamId() = json["homeTeamId"].get<std::string>();
+        }
+        if (json.contains("visitorTeamId")) {
+            match.VisitorTeamId() = json["visitorTeamId"].get<std::string>();
+        }
+        if (json.contains("score")) {
+            json.at("score").get_to(match.MatchScore());
+        }
+        if (json.contains("winnerNextMatchId")) {
+            match.WinnerNextMatchId() = json["winnerNextMatchId"].get<std::string>();
+        }
+        if (json.contains("loserNextMatchId")) {
+            match.LoserNextMatchId() = json["loserNextMatchId"].get<std::string>();
+        }
+        if (json.contains("roundNumber")) {
+            json.at("roundNumber").get_to(match.RoundNumber());
+        }
+        if (json.contains("bracketType")) {
+            match.Bracket() = bracketTypeFromString(json["bracketType"].get<std::string>());
+        }
+        if (json.contains("isFirstFinal")) {
+            json.at("isFirstFinal").get_to(match.IsFirstFinal());
+        }
+    }
+
+    inline void to_json(nlohmann::json& json, const std::shared_ptr<Match>& match) {
+        json = nlohmann::json::object();
+        if (!match->Id().empty()) {
+            json["id"] = match->Id();
+        }
+        if (!match->TournamentId().empty()) {
+            json["tournamentId"] = match->TournamentId();
+        }
+        if (!match->HomeTeamId().empty()) {
+            json["homeTeamId"] = match->HomeTeamId();
+        }
+        if (!match->VisitorTeamId().empty()) {
+            json["visitorTeamId"] = match->VisitorTeamId();
+        }
+        json["score"] = match->MatchScore();
+        if (!match->WinnerNextMatchId().empty()) {
+            json["winnerNextMatchId"] = match->WinnerNextMatchId();
+        }
+        if (!match->LoserNextMatchId().empty()) {
+            json["loserNextMatchId"] = match->LoserNextMatchId();
+        }
+        json["roundNumber"] = match->RoundNumber();
+        json["bracketType"] = bracketTypeToString(match->Bracket());
+        json["isFirstFinal"] = match->IsFirstFinal();
+    }
+
+    inline void to_json(nlohmann::json& json, const std::vector<std::shared_ptr<Match>>& matches) {
+        json = nlohmann::json::array();
+        for (const auto& match : matches) {
+            nlohmann::json matchJson;
+            to_json(matchJson, match);
+            json.push_back(matchJson);
+        }
     }
 }
 
