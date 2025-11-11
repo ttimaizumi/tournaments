@@ -4,6 +4,7 @@
 #include <string>
 namespace domain {
     enum class Winner { HOME, VISITOR  };
+    
     struct Score {
         int homeTeamScore;
         int visitorTeamScore;
@@ -14,16 +15,15 @@ namespace domain {
             return Winner::VISITOR;
         }
     };
+    
     class Match {
         /* data */
         std::string id;
+        std::string name; // e.g., "W0", "W1", "L0", "L1", "F0", "F1"
         std::string tournamentId;
         std::string homeTeamId;
         std::string visitorTeamId;
         Score score;
-
-        //winner's next match
-        //loser's next match
 
     public:
         Match(/* args */){}
@@ -34,6 +34,14 @@ namespace domain {
 
         std::string& Id() {
             return  id;
+        }
+
+        [[nodiscard]] std::string Name() const {
+            return name;
+        }
+
+        std::string& Name() {
+            return name;
         }
 
         [[nodiscard]] std::string TournamentId() const {
