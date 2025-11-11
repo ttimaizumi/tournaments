@@ -5,17 +5,37 @@
 #ifndef TOURNAMENTS_IMATCHREPOSITORY_HPP
 #define TOURNAMENTS_IMATCHREPOSITORY_HPP
 
-#include <string_view>
+#pragma once
+
 #include <vector>
 #include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
 
-#include "domain/Match.hpp"
+#include <nlohmann/json.hpp>
 
-class IMatchRepository : public IRepository<domain::Match, std::string> {
+class IMatchRepository
+{
 public:
     virtual ~IMatchRepository() = default;
-    //Find match with only one team to be added
-    virtual domain::Match FindLastOpenMatch(const std::string_view& tournamentId) = 0;
-    virtual std::vector<std::shared_ptr<domain::Match>> FindMatchesByTournamentAndRound(const std::string_view& tournamentId) = 0;
+
+    // Regresa todos los partidos del torneo, con filtro opcional de status (played/pending)
+    virtual std::vector<nlohmann::json>
+    FindByTournament(std::string_view tournamentId,
+                     std::optional<std::string> statusFilter) = 0;
+
+    // Regresa un solo partido por torneo + matchId
+    virtual std::optional<nlohmann::json>
+    FindByTournamentAndId(std::string_view tournamentId,
+                          std::string_view matchId) = 0;
+
+    // Actualizar marcador y status (ej: played)
+    virtual bool
+    UpdateScore(std::string_view tournamentId,
+                std::string_view matchId,
+                const nlohmann::json& newScore,
+                std::string newStatus) = 0;
 };
+
 #endif //TOURNAMENTS_IMATCHREPOSITORY_HPP

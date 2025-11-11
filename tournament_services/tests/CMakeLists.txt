@@ -12,6 +12,8 @@ set(TEST_SOURCES
         delegate/TeamDelegateTest.cpp
         delegate/TournamentDelegateTest.cpp
         delegate/GroupDelegateTest.cpp
+        controller/MatchControllerTest.cpp
+        delegate/MatchDelegateTest.cpp
 
         # units under test (compiled into the test runner)
         ../src/controller/TeamController.cpp
@@ -20,6 +22,10 @@ set(TEST_SOURCES
         ../src/delegate/TeamDelegate.cpp
         ../src/delegate/TournamentDelegate.cpp
         ../src/delegate/GroupDelegate.cpp
+        ../src/controller/MatchController.cpp
+        ../src/delegate/MatchDelegate.cpp
+        delegate/MatchDelegateTest.cpp
+        controller/MatchControllerTest.cpp
 )
 
 # headers from services and common

@@ -11,6 +11,10 @@ set(SERVICES_SOURCES
         src/controller/TournamentController.cpp
         src/controller/TeamController.cpp
         src/controller/GroupController.cpp
+        include/delegate/IMatchDelegate.hpp
+        src/delegate/MatchDelegate.cpp
+        src/controller/MatchController.cpp
+
 )
 
 find_package(Crow CONFIG REQUIRED)
