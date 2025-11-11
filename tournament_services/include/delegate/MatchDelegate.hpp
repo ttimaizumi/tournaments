@@ -1,22 +1,21 @@
-#ifndef A251C297_DF53_4BEB_93D6_DB45EAC8C825
-#define A251C297_DF53_4BEB_93D6_DB45EAC8C825
+#ifndef RESTAPI_MATCH_DELEGATE_HPP
+#define RESTAPI_MATCH_DELEGATE_HPP
 
-class MatchDelegate
-{
-private:
-    /* data */
+#include <expected>
+#include <string>
+#include <vector>
+#include <memory>
+#include "domain/Match.hpp"
+#include "exception/Error.hpp"
+#include "delegate/IMatchDelegate.hpp"
+
+class MatchDelegate : public IMatchDelegate {
+    std::shared_ptr<IMatchDelegate> matchRepository;
 public:
-    MatchDelegate(/* args */);
-    ~MatchDelegate();
-};
+    explicit MatchDelegate(const std::shared_ptr<IMatchDelegate>& matchRepository);
+    std::expected<std::shared_ptr<domain::Match>, Error> GetMatch(std::string_view tournamentId, std::string_view matchId) override;
+    std::expected<std::vector<std::shared_ptr<domain::Match>>, Error> GetMatches(std::string_view tournamentId) override;
+    std::expected<std::string, Error> UpdateMatchScore(const domain::Match& match) override;
+};  
 
-MatchDelegate::MatchDelegate(/* args */)
-{
-}
-
-MatchDelegate::~MatchDelegate()
-{
-}
-
-
-#endif /* A251C297_DF53_4BEB_93D6_DB45EAC8C825 */
+#endif /* RESTAPI_MATCH_DELEGATE_HPP */
