@@ -148,21 +148,21 @@ namespace domain {
         json["teams"] = group.Teams();
     }
 
-    inline std::string bracketTypeToString(BracketType type) {
-        switch (type) {
-            case BracketType::WINNERS: return "WINNERS";
-            case BracketType::LOSERS: return "LOSERS";
-            case BracketType::FINAL: return "FINAL";
-            default: return "WINNERS";
-        }
-    }
+    // inline std::string bracketTypeToString(BracketType type) {
+    //     switch (type) {
+    //         case BracketType::WINNERS: return "WINNERS";
+    //         case BracketType::LOSERS: return "LOSERS";
+    //         case BracketType::FINAL: return "FINAL";
+    //         default: return "WINNERS";
+    //     }
+    // }
 
-    inline BracketType bracketTypeFromString(std::string_view type) {
-        if (type == "WINNERS") return BracketType::WINNERS;
-        if (type == "LOSERS") return BracketType::LOSERS;
-        if (type == "FINAL") return BracketType::FINAL;
-        return BracketType::WINNERS;
-    }
+    // inline BracketType bracketTypeFromString(std::string_view type) {
+    //     if (type == "WINNERS") return BracketType::WINNERS;
+    //     if (type == "LOSERS") return BracketType::LOSERS;
+    //     if (type == "FINAL") return BracketType::FINAL;
+    //     return BracketType::WINNERS;
+    // }
 
     inline void to_json(nlohmann::json& json, const Score& score) {
         json = {
@@ -193,15 +193,15 @@ namespace domain {
             json["visitorTeamId"] = match.VisitorTeamId();
         }
         json["score"] = match.MatchScore();
-        if (!match.WinnerNextMatchId().empty()) {
-            json["winnerNextMatchId"] = match.WinnerNextMatchId();
-        }
-        if (!match.LoserNextMatchId().empty()) {
-            json["loserNextMatchId"] = match.LoserNextMatchId();
-        }
-        json["roundNumber"] = match.RoundNumber();
-        json["bracketType"] = bracketTypeToString(match.Bracket());
-        json["isFirstFinal"] = match.IsFirstFinal();
+        // if (!match.WinnerNextMatchId().empty()) {
+        //     json["winnerNextMatchId"] = match.WinnerNextMatchId();
+        // }
+        // if (!match.LoserNextMatchId().empty()) {
+        //     json["loserNextMatchId"] = match.LoserNextMatchId();
+        // }
+        // json["roundNumber"] = match.RoundNumber();
+        // json["bracketType"] = bracketTypeToString(match.Bracket());
+        // json["isFirstFinal"] = match.IsFirstFinal();
     }
 
     inline void from_json(const nlohmann::json& json, Match& match) {
@@ -220,21 +220,21 @@ namespace domain {
         if (json.contains("score")) {
             json.at("score").get_to(match.MatchScore());
         }
-        if (json.contains("winnerNextMatchId")) {
-            match.WinnerNextMatchId() = json["winnerNextMatchId"].get<std::string>();
-        }
-        if (json.contains("loserNextMatchId")) {
-            match.LoserNextMatchId() = json["loserNextMatchId"].get<std::string>();
-        }
-        if (json.contains("roundNumber")) {
-            json.at("roundNumber").get_to(match.RoundNumber());
-        }
-        if (json.contains("bracketType")) {
-            match.Bracket() = bracketTypeFromString(json["bracketType"].get<std::string>());
-        }
-        if (json.contains("isFirstFinal")) {
-            json.at("isFirstFinal").get_to(match.IsFirstFinal());
-        }
+        // if (json.contains("winnerNextMatchId")) {
+        //     match.WinnerNextMatchId() = json["winnerNextMatchId"].get<std::string>();
+        // }
+        // if (json.contains("loserNextMatchId")) {
+        //     match.LoserNextMatchId() = json["loserNextMatchId"].get<std::string>();
+        // }
+        // if (json.contains("roundNumber")) {
+        //     json.at("roundNumber").get_to(match.RoundNumber());
+        // }
+        // if (json.contains("bracketType")) {
+        //     match.Bracket() = bracketTypeFromString(json["bracketType"].get<std::string>());
+        // }
+        // if (json.contains("isFirstFinal")) {
+        //     json.at("isFirstFinal").get_to(match.IsFirstFinal());
+        // }
     }
 
     inline void to_json(nlohmann::json& json, const std::shared_ptr<Match>& match) {
@@ -252,15 +252,15 @@ namespace domain {
             json["visitorTeamId"] = match->VisitorTeamId();
         }
         json["score"] = match->MatchScore();
-        if (!match->WinnerNextMatchId().empty()) {
-            json["winnerNextMatchId"] = match->WinnerNextMatchId();
-        }
-        if (!match->LoserNextMatchId().empty()) {
-            json["loserNextMatchId"] = match->LoserNextMatchId();
-        }
-        json["roundNumber"] = match->RoundNumber();
-        json["bracketType"] = bracketTypeToString(match->Bracket());
-        json["isFirstFinal"] = match->IsFirstFinal();
+        // if (!match->WinnerNextMatchId().empty()) {
+        //     json["winnerNextMatchId"] = match->WinnerNextMatchId();
+        // }
+        // if (!match->LoserNextMatchId().empty()) {
+        //     json["loserNextMatchId"] = match->LoserNextMatchId();
+        // }
+        // json["roundNumber"] = match->RoundNumber();
+        // json["bracketType"] = bracketTypeToString(match->Bracket());
+        // json["isFirstFinal"] = match->IsFirstFinal();
     }
 
     inline void to_json(nlohmann::json& json, const std::vector<std::shared_ptr<Match>>& matches) {

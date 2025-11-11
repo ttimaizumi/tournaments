@@ -5,6 +5,7 @@ set(COMMON_SOURCES
         src/persistence/repository/TeamRepository.cpp
         src/persistence/repository/TournamentRepository.cpp
         src/persistence/repository/GroupRepository.cpp
+        src/persistence/repository/MatchRepository.cpp
         include/exception/Error.hpp
 )
 
