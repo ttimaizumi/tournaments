@@ -3,6 +3,7 @@
 #include "exception/InvalidFormat.hpp"
 #include "exception/Duplicate.hpp"
 #include "exception/Error.hpp"
+#include <nlohmann/json.hpp>
 
 #include <utility>
 #include <sstream>
@@ -200,11 +201,11 @@ std::expected<void, Error> GroupDelegate::UpdateTeams(const std::string_view& to
         }
         try {
             groupRepository->UpdateGroupAddTeam(groupId, persistedTeam);
-            // std::unique_ptr<nlohmann::json> message = std::make_unique<nlohmann::json>();
-            // message->emplace("tournamentId", tournamentId);
-            // message->emplace("groupId", groupId);
-            // message->emplace("teamId", team.Id());
-            // messageProducer->SendMessage(message->dump(), "tournament.team-add");
+            std::unique_ptr<nlohmann::json> message = std::make_unique<nlohmann::json>();
+            message->emplace("tournamentId", tournamentId);
+            message->emplace("groupId", groupId);
+            message->emplace("teamId", team.Id());
+            messageProducer->SendMessage(message->dump(), "tournament.team-add");
         } catch (const std::exception& e) {
             return std::unexpected(Error::UNKNOWN_ERROR);
         }
