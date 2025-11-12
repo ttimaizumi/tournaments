@@ -15,6 +15,8 @@
 #include "cms/QueueMessageListener.hpp"
 #include "cms/GroupAddTeamListener.hpp"
 #include "cms/ScoreRecordedListener.hpp"
+#include "cms/TournamentFullListener.hpp"
+
 
 #include "persistence/configuration/IDbConnectionProvider.hpp"
 #include "persistence/configuration/PostgresConnectionProvider.hpp"
@@ -26,6 +28,10 @@
 // match repo
 #include "persistence/repository/IMatchRepository.hpp"
 #include "persistence/repository/MatchRepository.hpp"
+
+// group repo
+#include "persistence/repository/IGroupRepository.hpp"
+#include "persistence/repository/GroupRepository.hpp"
 
 namespace config {
 
@@ -63,9 +69,15 @@ namespace config {
             .as<IMatchRepository>()
             .singleInstance();
 
+        builder.registerType<GroupRepository>()
+           .as<IGroupRepository>()
+           .singleInstance();
+
         // listeners
         builder.registerType<GroupAddTeamListener>();
         builder.registerType<ScoreRecordedListener>();
+        builder.registerType<TournamentFullListener>();
+
 
         return builder.build();
     }

@@ -123,6 +123,10 @@ crow::response GroupController::UpdateTeams(const crow::request& request,
                                             const std::string& tournamentId,
                                             const std::string& groupId) {
     try {
+        std::cout << "[DEBUG UpdateTeams] Body: '" << request.body << "'" << std::endl;
+        std::cout << "[DEBUG UpdateTeams] Body length: " << request.body.length() << std::endl;
+        std::cout << "[DEBUG UpdateTeams] Content-Type: " << request.get_header_value("Content-Type") << std::endl;
+
         const json j = json::parse(request.body, nullptr, true);
         if (!j.is_array()) return crow::response{crow::BAD_REQUEST, "expect array"};
 
@@ -137,6 +141,8 @@ crow::response GroupController::UpdateTeams(const crow::request& request,
         auto r = groupDelegate->UpdateTeams(tournamentId, groupId, teams);
         if (!r.has_value()) {
             const auto& err = r.error();
+            std::cout << "[DEBUG UpdateTeams] Delegate error: '" << err << "'" << std::endl;
+
             if (err == "group-not-found")                 return crow::response{422, "Group does not exist"};
             if (err == "group-full")                      return crow::response{422, "Group at max capacity"};
             if (err.rfind("team-not-found", 0) == 0)     return crow::response{422, err};

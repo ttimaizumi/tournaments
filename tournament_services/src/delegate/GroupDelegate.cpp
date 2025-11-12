@@ -1,5 +1,6 @@
 #include "delegate/GroupDelegate.hpp"
 #include <nlohmann/json.hpp>
+#include <iostream>
 
 using nlohmann::json;
 
@@ -38,7 +39,7 @@ GroupDelegate::CreateGroup(const std::string_view& tournamentId, const domain::G
 
     if (queueProducer) {
         // queueProducer->SendMessage(id, "group.created"); // test espera ("g1","group.created")
-        queueProducer->SendMessage(std::string_view{id}, std::string_view{"group.created"});
+        queueProducer->SendMessage(id, "group.created");
     }
     return id;
 }
@@ -120,9 +121,30 @@ GroupDelegate::UpdateTeams(const std::string_view& tournamentId,
         groupRepository->UpdateGroupAddTeam(std::string(groupId), persistedTeam);
 
         if (queueProducer) {
-            // el test espera ("p1", "group.team-added")
-            queueProducer->SendMessage(persistedTeam->Id, "group.team-added");
+            // Enviar evento con información completa
+            nlohmann::json eventPayload;
+            eventPayload["tournamentId"] = std::string(tournamentId);
+            eventPayload["groupId"] = std::string(groupId);
+            eventPayload["teamId"] = persistedTeam->Id;
+            eventPayload["teamName"] = persistedTeam->Name;
+
+            std::string messageBody = eventPayload.dump();
+            queueProducer->SendMessage(messageBody, "group.team-added");
         }
+    }
+
+    // 4) Verificar si se completaron los 32 equipos para generar matches
+    auto updatedGroup = groupRepository->FindByTournamentIdAndGroupId(tournamentId, groupId);
+    if (updatedGroup && updatedGroup->Teams().size() == 32 && queueProducer) {
+        nlohmann::json tournamentFullEvent;
+        tournamentFullEvent["tournamentId"] = std::string(tournamentId);
+        tournamentFullEvent["groupId"] = std::string(groupId);
+        tournamentFullEvent["teamCount"] = updatedGroup->Teams().size();
+
+        std::string messageBody = tournamentFullEvent.dump();
+        queueProducer->SendMessage(messageBody, "tournament.full");
+
+        std::cout << "[GroupDelegate] Tournament FULL! 32 teams reached. Event sent to generate matches." << std::endl;
     }
     return {};
 }

@@ -6,15 +6,20 @@
 #define TOURNAMENT_FULL_LISTENER_HPP
 
 #include "cms/QueueMessageListener.hpp"
+#include "persistence/repository/IMatchRepository.hpp"
+#include "persistence/repository/IGroupRepository.hpp"
 #include <memory>
 
-// Por ahora este listener solo va a leer el evento tournament.full
-// y escribir en consola. Después ya lo podemos hacer que cree grupos
-// y matches si quieres, pero primero probamos el flujo de eventos.
+// Listener que genera los 16 matches iniciales del Winner Bracket
+// cuando un torneo alcanza 32 equipos
 
 class TournamentFullListener : public QueueMessageListener {
+    std::shared_ptr<IMatchRepository> matchRepo;
+    std::shared_ptr<IGroupRepository> groupRepo;
 public:
-    explicit TournamentFullListener(const std::shared_ptr<ConnectionManager>& cm);
+    TournamentFullListener(const std::shared_ptr<ConnectionManager>& cm,
+                         const std::shared_ptr<IMatchRepository>& matchRepository,
+                         const std::shared_ptr<IGroupRepository>& groupRepository);
 
 protected:
     void processMessage(const std::string& message) override;

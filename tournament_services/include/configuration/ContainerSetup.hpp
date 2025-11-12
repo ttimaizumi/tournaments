@@ -13,6 +13,7 @@
 #include "persistence/repository/TeamRepository.hpp"
 #include "persistence/repository/TournamentRepository.hpp"
 #include "persistence/repository/GroupRepository.hpp"
+#include "persistence/repository/IGroupRepository.hpp"
 
 // Match repo
 #include "persistence/repository/IMatchRepository.hpp"
@@ -85,6 +86,7 @@ namespace config {
             .singleInstance();
 
         builder.registerType<GroupRepository>()
+            .as<IGroupRepository>()
             .singleInstance();
 
         builder.registerType<GroupRepository>()
