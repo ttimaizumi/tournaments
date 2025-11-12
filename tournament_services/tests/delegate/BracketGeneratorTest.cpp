@@ -26,7 +26,7 @@ protected:
         }
     }
     
-    // Helper to check if match name starts with prefix
+    // Helper to check if match name starts with W/L/F
     bool MatchNameStartsWith(const domain::Match& match, const std::string& prefix) {
         return match.Name().substr(0, prefix.length()) == prefix;
     }
