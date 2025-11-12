@@ -1,34 +1,39 @@
-#ifndef B37FEB69_6E3C_4DA6_BBCA_1BD46BF5F632
-#define B37FEB69_6E3C_4DA6_BBCA_1BD46BF5F632
-
+#ifndef MATCH_CONTROLLER_HPP
+#define MATCH_CONTROLLER_HPP
 #pragma once
 
 #include <memory>
 #include <regex>
 #include <string>
-
 #include <crow.h>
 #include <nlohmann/json.hpp>
-
 #include "delegate/IMatchDelegate.hpp"
 
-class MatchController
-{
+class MatchController {
     std::shared_ptr<IMatchDelegate> delegate;
-    static const std::regex kIdPattern;
 
 public:
-    explicit MatchController(const std::shared_ptr<IMatchDelegate>& d);
+    static const std::regex kIdPattern;
 
+    explicit MatchController(const std::shared_ptr<IMatchDelegate>& d)
+        : delegate(d) {}
+
+    // POST /tournaments/<id>/matches
+    crow::response CreateMatch(const crow::request& req,
+                               const std::string& tournamentId) const;
+
+    // GET /tournaments/<id>/matches?status=played|scheduled
     crow::response GetMatches(const crow::request& req,
                               const std::string& tournamentId) const;
 
+    // GET /tournaments/<id>/matches/<matchId>
     crow::response GetMatch(const std::string& tournamentId,
                             const std::string& matchId) const;
 
+    // PATCH /tournaments/<id>/matches/<matchId>  body: {"score":{"home":X,"visitor":Y}}
     crow::response PatchScore(const crow::request& req,
                               const std::string& tournamentId,
                               const std::string& matchId) const;
 };
 
-#endif /* B37FEB69_6E3C_4DA6_BBCA_1BD46BF5F632 */
+#endif // MATCH_CONTROLLER_HPP

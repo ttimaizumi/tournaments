@@ -2,6 +2,7 @@ project(tournament_consumer)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CONSUMER_SOURCES
+        include/cms/ScoreRecordedListener.hpp
 )
 
 find_package(libpqxx CONFIG REQUIRED)

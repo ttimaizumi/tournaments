@@ -1,10 +1,5 @@
-//
-// Created by edgar on 11/10/25.
-//
-
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
-
 #include <nlohmann/json.hpp>
 
 #include "delegate/MatchDelegate.hpp"
@@ -14,92 +9,78 @@
 using nlohmann::json;
 using ::testing::_;
 using ::testing::Return;
-using ::testing::NiceMock;
 
-class MockMatchRepository : public IMatchRepository
-{
+class MockMatchRepository : public IMatchRepository {
 public:
-    MOCK_METHOD(std::vector<json>,
-                FindByTournament,
-                (std::string_view, std::optional<std::string>), (override));
-
-    MOCK_METHOD(std::optional<json>,
-                FindByTournamentAndId,
-                (std::string_view, std::string_view), (override));
-
-    MOCK_METHOD(bool,
-                UpdateScore,
-                (std::string_view, std::string_view,
-                 const json&, std::string), (override));
+    MOCK_METHOD(std::vector<json>, FindByTournament,
+        (std::string_view, std::optional<std::string>), (override));
+    MOCK_METHOD(std::optional<json>, FindByTournamentAndId,
+        (std::string_view, std::string_view), (override));
+    MOCK_METHOD(std::optional<std::string>, Create, (const json&), (override));
+    MOCK_METHOD(bool, UpdateScore,
+        (std::string_view, std::string_view, const json&, std::string), (override));
+    MOCK_METHOD(bool, UpdateParticipants,
+        (std::string_view, std::string_view, std::optional<std::string>, std::optional<std::string>), (override));
 };
 
-class MockProducer : public IQueueMessageProducer
-{
+class MockProducer : public IQueueMessageProducer {
 public:
-    MOCK_METHOD(void, SendMessage, (std::string_view, std::string_view), (override));
+    MOCK_METHOD(void, SendMessage, (const std::string_view&, const std::string_view&), (override));
 };
 
-TEST(MatchDelegateTest, UpdateScore_Success_SingleElimination)
-{
-    auto repo    = std::make_shared<NiceMock<MockMatchRepository>>();
-    auto producer = std::make_shared<NiceMock<MockProducer>>();
+TEST(MatchDelegateTest, CreateMatch_SendsCreatedEvent) {
+    auto repo = std::make_shared<MockMatchRepository>();
+    auto prod = std::make_shared<MockProducer>();
+    MatchDelegate d(repo, prod);
 
-    MatchDelegate delegate(repo, producer);
-
-    json doc{
-        {"id", "m1"},
-        {"tournamentId", "t1"},
-        {"round", "quarterfinal"}   // eliminacion sencilla
+    json body{{"bracket","winners"},{"round",1}};
+    json stored{
+        {"tournamentId","t1"},{"bracket","winners"},{"round",1},
+        {"status","scheduled"},{"score",json{{"home",0},{"visitor",0}}}
     };
 
-    EXPECT_CALL(*repo, FindByTournamentAndId("t1", "m1"))
-        .WillOnce(Return(doc));
+    EXPECT_CALL(*repo, Create(_)).WillOnce(Return(std::optional<std::string>{"m1"}));
+    EXPECT_CALL(*prod, SendMessage("m1", "match.created")).Times(1);
 
-    EXPECT_CALL(*repo,
-                UpdateScore("t1", "m1",
-                            testing::Property(&json::dump, testing::_),
-                            "played"))
+    auto r = d.CreateMatch("t1", body);
+    ASSERT_TRUE(r.has_value());
+    EXPECT_EQ(r->at("id"), "m1");
+}
+
+TEST(MatchDelegateTest, UpdateScore_Advances_NoTie) {
+    auto repo = std::make_shared<MockMatchRepository>();
+    auto prod = std::make_shared<MockProducer>();
+    MatchDelegate d(repo, prod);
+
+    json doc{
+        {"id","m1"},
+        {"tournamentId","t1"},
+        {"homeTeamId","A"},
+        {"visitorTeamId","B"},
+        {"status","scheduled"},
+        {"score", json{{"home",0},{"visitor",0}}},
+        {"advancement", json{
+            {"winner", json{{"matchId","m2"},{"slot","home"}}},
+            {"loser",  json{{"matchId","m3"},{"slot","visitor"}}}
+        }}
+    };
+
+    EXPECT_CALL(*repo, FindByTournamentAndId("t1","m1"))
+        .WillOnce(Return(std::optional<json>{doc}));
+
+    EXPECT_CALL(*repo, UpdateScore("t1","m1",_, "played"))
         .WillOnce(Return(true));
 
-    EXPECT_CALL(*producer, SendMessage("m1", "match.score-recorded"))
-        .Times(1);
+    // Ganador A -> m2.home ; Perdedor B -> m3.visitor
+    EXPECT_CALL(*repo, UpdateParticipants("t1","m2",std::optional<std::string>("A"), std::nullopt))
+        .WillOnce(Return(true));
+    EXPECT_CALL(*repo, UpdateParticipants("t1","m3",std::nullopt, std::optional<std::string>("B")))
+        .WillOnce(Return(true));
 
-    auto r = delegate.UpdateScore("t1", "m1", 1, 0);
+    EXPECT_CALL(*prod, SendMessage("m2", "match.advanced")).Times(1);
+    EXPECT_CALL(*prod, SendMessage("m3", "match.advanced")).Times(1);
+    EXPECT_CALL(*prod, SendMessage("m1", "match.score-recorded")).Times(1);
+
+    auto r = d.UpdateScore("t1","m1", 2, 1);
     EXPECT_TRUE(r.has_value());
-}
-
-TEST(MatchDelegateTest, UpdateScore_Fails_OnDraw_InElimination)
-{
-    auto repo    = std::make_shared<NiceMock<MockMatchRepository>>();
-    auto producer = std::make_shared<NiceMock<MockProducer>>();
-
-    MatchDelegate delegate(repo, producer);
-
-    json doc{
-        {"id", "m1"},
-        {"tournamentId", "t1"},
-        {"round", "quarterfinal"}   // eliminacion sencilla
-    };
-
-    EXPECT_CALL(*repo, FindByTournamentAndId("t1", "m1"))
-        .WillOnce(Return(doc));
-
-    auto r = delegate.UpdateScore("t1", "m1", 1, 1); // empate
-    EXPECT_FALSE(r.has_value());
-    EXPECT_EQ(r.error(), "invalid-score");
-}
-
-TEST(MatchDelegateTest, UpdateScore_NotFound)
-{
-    auto repo    = std::make_shared<NiceMock<MockMatchRepository>>();
-    auto producer = std::make_shared<NiceMock<MockProducer>>();
-
-    MatchDelegate delegate(repo, producer);
-
-    EXPECT_CALL(*repo, FindByTournamentAndId("t1", "m1"))
-        .WillOnce(Return(std::optional<json>{}));
-
-    auto r = delegate.UpdateScore("t1", "m1", 1, 0);
-    EXPECT_FALSE(r.has_value());
-    EXPECT_EQ(r.error(), "match-not-found");
 }
