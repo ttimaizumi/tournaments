@@ -61,9 +61,9 @@ TEST_F(MatchControllerTest, GetMatch_Ok) {
   EXPECT_EQ(expectedMatch->HomeTeamId(), jsonResponse["homeTeamId"].get<std::string>());
   EXPECT_EQ(expectedMatch->VisitorTeamId(), jsonResponse["visitorTeamId"].get<std::string>());
   EXPECT_EQ(expectedMatch->MatchScore().homeTeamScore, 
-            jsonResponse["matchScore"]["homeTeamScore"].get<int>());
+            jsonResponse["score"]["homeTeamScore"].get<int>());
   EXPECT_EQ(expectedMatch->MatchScore().visitorTeamScore, 
-            jsonResponse["matchScore"]["visitorTeamScore"].get<int>());
+            jsonResponse["score"]["visitorTeamScore"].get<int>());
 }
 
 // Validar respuesta NOT_FOUND cuando el match no existe. Response 404
@@ -141,8 +141,8 @@ TEST_F(MatchControllerTest, GetMatches_Ok) {
   EXPECT_EQ(jsonResponse[0]["name"].get<std::string>(), matches[0]->Name());
   EXPECT_EQ(jsonResponse[0]["homeTeamId"].get<std::string>(), matches[0]->HomeTeamId());
   EXPECT_EQ(jsonResponse[0]["visitorTeamId"].get<std::string>(), matches[0]->VisitorTeamId());
-  EXPECT_EQ(jsonResponse[0]["matchScore"]["homeTeamScore"].get<int>(), 3);
-  EXPECT_EQ(jsonResponse[0]["matchScore"]["visitorTeamScore"].get<int>(), 1);
+  EXPECT_EQ(jsonResponse[0]["score"]["homeTeamScore"].get<int>(), 3);
+  EXPECT_EQ(jsonResponse[0]["score"]["visitorTeamScore"].get<int>(), 1);
   
   EXPECT_EQ(jsonResponse[1]["id"].get<std::string>(), matches[1]->Id());
   EXPECT_EQ(jsonResponse[1]["name"].get<std::string>(), matches[1]->Name());
@@ -191,7 +191,7 @@ TEST_F(MatchControllerTest, UpdateMatchScore_Ok) {
         testing::Return(std::expected<std::string, Error>{std::in_place, matchId})));
 
   nlohmann::json requestBody = {
-    {"matchScore", {
+    {"score", {
       {"homeTeamScore", 3},
       {"visitorTeamScore", 2}
     }}
@@ -221,7 +221,7 @@ TEST_F(MatchControllerTest, UpdateMatchScore_ZeroScores) {
         testing::Return(std::expected<std::string, Error>{std::in_place, matchId})));
 
   nlohmann::json requestBody = {
-    {"matchScore", {
+    {"score", {
       {"homeTeamScore", 0},
       {"visitorTeamScore", 0}
     }}
@@ -251,7 +251,7 @@ TEST_F(MatchControllerTest, UpdateMatchScore_InvalidJson) {
   EXPECT_EQ("Invalid JSON format", response.body);
 }
 
-// Validar error cuando falta el objeto matchScore. Response 400
+// Validar error cuando falta el objeto score. Response 400
 TEST_F(MatchControllerTest, UpdateMatchScore_MissingMatchScore) {
   std::string tournamentId = "550e8400-e29b-41d4-a716-446655440000";
   std::string matchId = "match-id-001";
@@ -267,16 +267,16 @@ TEST_F(MatchControllerTest, UpdateMatchScore_MissingMatchScore) {
   crow::response response = matchController->updateMatchScore(request, tournamentId, matchId);
 
   EXPECT_EQ(crow::BAD_REQUEST, response.code);
-  EXPECT_EQ("Missing or invalid matchScore object", response.body);
+  EXPECT_EQ("Missing or invalid score object", response.body);
 }
 
-// Validar error cuando matchScore no es un objeto. Response 400
+// Validar error cuando score no es un objeto. Response 400
 TEST_F(MatchControllerTest, UpdateMatchScore_MatchScoreNotObject) {
   std::string tournamentId = "550e8400-e29b-41d4-a716-446655440000";
   std::string matchId = "match-id-001";
   
   nlohmann::json requestBody = {
-    {"matchScore", "not an object"}
+    {"score", "not an object"}
   };
   
   crow::request request;
@@ -285,7 +285,7 @@ TEST_F(MatchControllerTest, UpdateMatchScore_MatchScoreNotObject) {
   crow::response response = matchController->updateMatchScore(request, tournamentId, matchId);
 
   EXPECT_EQ(crow::BAD_REQUEST, response.code);
-  EXPECT_EQ("Missing or invalid matchScore object", response.body);
+  EXPECT_EQ("Missing or invalid score object", response.body);
 }
 
 // Validar error cuando faltan campos de scores. Response 400
@@ -294,7 +294,7 @@ TEST_F(MatchControllerTest, UpdateMatchScore_MissingScoreFields) {
   std::string matchId = "match-id-001";
   
   nlohmann::json requestBody = {
-    {"matchScore", {
+    {"score", {
       {"homeTeamScore", 3}
       // falta visitorTeamScore
     }}
@@ -306,7 +306,7 @@ TEST_F(MatchControllerTest, UpdateMatchScore_MissingScoreFields) {
   crow::response response = matchController->updateMatchScore(request, tournamentId, matchId);
 
   EXPECT_EQ(crow::BAD_REQUEST, response.code);
-  EXPECT_EQ("matchScore must contain integer homeTeamScore and visitorTeamScore", response.body);
+  EXPECT_EQ("score must contain integer homeTeamScore and visitorTeamScore", response.body);
 }
 
 // Validar error cuando los scores no son enteros. Response 400
@@ -315,7 +315,7 @@ TEST_F(MatchControllerTest, UpdateMatchScore_ScoresNotInteger) {
   std::string matchId = "match-id-001";
   
   nlohmann::json requestBody = {
-    {"matchScore", {
+    {"score", {
       {"homeTeamScore", "three"},
       {"visitorTeamScore", 2}
     }}
@@ -327,7 +327,7 @@ TEST_F(MatchControllerTest, UpdateMatchScore_ScoresNotInteger) {
   crow::response response = matchController->updateMatchScore(request, tournamentId, matchId);
 
   EXPECT_EQ(crow::BAD_REQUEST, response.code);
-  EXPECT_EQ("matchScore must contain integer homeTeamScore and visitorTeamScore", response.body);
+  EXPECT_EQ("score must contain integer homeTeamScore and visitorTeamScore", response.body);
 }
 
 // Validar error cuando los scores son negativos. Response 400
@@ -336,7 +336,7 @@ TEST_F(MatchControllerTest, UpdateMatchScore_NegativeScores) {
   std::string matchId = "match-id-001";
   
   nlohmann::json requestBody = {
-    {"matchScore", {
+    {"score", {
       {"homeTeamScore", -1},
       {"visitorTeamScore", 2}
     }}
@@ -358,7 +358,7 @@ TEST_F(MatchControllerTest, UpdateMatchScore_TournamentIdMismatch) {
   
   nlohmann::json requestBody = {
     {"tournamentId", "different-tournament-id"},
-    {"matchScore", {
+    {"score", {
       {"homeTeamScore", 3},
       {"visitorTeamScore", 2}
     }}
@@ -380,7 +380,7 @@ TEST_F(MatchControllerTest, UpdateMatchScore_MatchIdMismatch) {
   
   nlohmann::json requestBody = {
     {"id", "different-match-id"},
-    {"matchScore", {
+    {"score", {
       {"homeTeamScore", 3},
       {"visitorTeamScore", 2}
     }}
@@ -405,7 +405,7 @@ TEST_F(MatchControllerTest, UpdateMatchScore_MatchNotFound) {
         std::expected<std::string, Error>{std::unexpected(Error::NOT_FOUND)}));
 
   nlohmann::json requestBody = {
-    {"matchScore", {
+    {"score", {
       {"homeTeamScore", 3},
       {"visitorTeamScore", 2}
     }}
@@ -429,7 +429,7 @@ TEST_F(MatchControllerTest, UpdateMatchScore_InvalidFormat) {
         std::expected<std::string, Error>{std::unexpected(Error::INVALID_FORMAT)}));
 
   nlohmann::json requestBody = {
-    {"matchScore", {
+    {"score", {
       {"homeTeamScore", 3},
       {"visitorTeamScore", 2}
     }}

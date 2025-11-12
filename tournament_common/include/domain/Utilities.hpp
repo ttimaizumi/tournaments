@@ -195,7 +195,7 @@ namespace domain {
         if (!match.VisitorTeamId().empty()) {
             json["visitorTeamId"] = match.VisitorTeamId();
         }
-        json["matchScore"] = match.MatchScore();
+        json["score"] = match.MatchScore();
     }
 
     inline void from_json(const nlohmann::json& json, Match& match) {
@@ -214,8 +214,8 @@ namespace domain {
         if (json.contains("visitorTeamId")) {
             match.VisitorTeamId() = json["visitorTeamId"].get<std::string>();
         }
-        if (json.contains("matchScore")) {
-            json.at("matchScore").get_to(match.MatchScore());
+        if (json.contains("score")) {
+            json.at("score").get_to(match.MatchScore());
         }
     }
 
@@ -236,7 +236,7 @@ namespace domain {
         if (!match->VisitorTeamId().empty()) {
             json["visitorTeamId"] = match->VisitorTeamId();
         }
-        json["matchScore"] = match->MatchScore();
+        json["score"] = match->MatchScore();
     }
 
     inline void to_json(nlohmann::json& json, const std::vector<std::shared_ptr<Match>>& matches) {
