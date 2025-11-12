@@ -16,6 +16,11 @@
 #include "cms/IQueueMessageProducer.hpp"
 #include "exception/Error.hpp"
 
+class MockQueueMessageProducer : public IQueueMessageProducer {
+public:
+    MOCK_METHOD(void, SendMessage, (const std::string_view& message, const std::string_view& queue), (override));
+};
+
 class MockGroupRepository : public IGroupRepository {
     public:
     MOCK_METHOD(std::vector<std::shared_ptr<domain::Group>>, FindByTournamentId, (const std::string_view& tournamentId), (override));
@@ -107,6 +112,7 @@ class GroupDelegateTest : public ::testing::Test {
     std::shared_ptr<MockTournamentRepository> mockTournamentRepository;
     std::shared_ptr<MockGroupRepository> mockGroupRepository;
     std::shared_ptr<MockTeamRepository> mockTeamRepository;
+    std::shared_ptr<MockQueueMessageProducer> mockMessageProducer;
     std::shared_ptr<TournamentRepositoryAdapter> tournamentAdapter;
     std::shared_ptr<TeamRepositoryAdapter> teamAdapter;
     std::shared_ptr<GroupDelegate> groupDelegate;
@@ -119,11 +125,12 @@ class GroupDelegateTest : public ::testing::Test {
         mockTournamentRepository = std::make_shared<MockTournamentRepository>();
         mockGroupRepository = std::make_shared<MockGroupRepository>();
         mockTeamRepository = std::make_shared<MockTeamRepository>();
+        mockMessageProducer = std::make_shared<MockQueueMessageProducer>();
         
         tournamentAdapter = std::make_shared<TournamentRepositoryAdapter>(mockTournamentRepository);
         teamAdapter = std::make_shared<TeamRepositoryAdapter>(mockTeamRepository);
         
-        groupDelegate = std::make_shared<GroupDelegate>(tournamentAdapter, mockGroupRepository, teamAdapter);
+        groupDelegate = std::make_shared<GroupDelegate>(tournamentAdapter, mockGroupRepository, teamAdapter, mockMessageProducer);
     }
 };
 

@@ -5,12 +5,13 @@
 #include <regex>
 #include <utility>
 #include <pqxx/pqxx>
+#include <nlohmann/json.hpp>
 
 #include "exception/Error.hpp"
 #include "domain/Constants.hpp"
 
-MatchDelegate::MatchDelegate(const std::shared_ptr<IMatchRepository>& matchRepository, const std::shared_ptr<TournamentRepository>& tournamentRepository)
-    : matchRepository(matchRepository), tournamentRepository(tournamentRepository) {}
+MatchDelegate::MatchDelegate(const std::shared_ptr<IMatchRepository>& matchRepository, const std::shared_ptr<TournamentRepository>& tournamentRepository, const std::shared_ptr<IQueueMessageProducer>& messageProducer)
+    : matchRepository(matchRepository), tournamentRepository(tournamentRepository), messageProducer(messageProducer) {}
 
 std::expected<std::vector<std::shared_ptr<domain::Match>>, Error> MatchDelegate::GetMatches(std::string_view tournamentId) {
     if (!std::regex_match(std::string{tournamentId}, ID_VALUE)) {
@@ -50,5 +51,18 @@ std::expected<std::string, Error> MatchDelegate::UpdateMatchScore(const domain::
   }
 
   matchRepository->UpdateMatchScore(match.Id(), score);
+  
+  // Send message to ActiveMQ for consumer to process
+  try {
+    std::unique_ptr<nlohmann::json> message = std::make_unique<nlohmann::json>();
+    message->emplace("tournamentId", match.TournamentId());
+    message->emplace("matchId", match.Id());
+    message->emplace("homeTeamScore", score.homeTeamScore);
+    message->emplace("visitorTeamScore", score.visitorTeamScore);
+    messageProducer->SendMessage(message->dump(), "tournament.score-update");
+  } catch (const std::exception& e) {
+    std::cout << "[MatchDelegate] ERROR sending message: " << e.what() << std::endl;
+  }
+  
   return std::string{match.Id()};
 }

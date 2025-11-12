@@ -17,7 +17,9 @@ public:
     virtual ~IMatchRepository() = default;
     virtual std::vector<std::shared_ptr<domain::Match>> FindByTournamentId(const std::string_view& tournamentId) = 0;
     virtual std::shared_ptr<domain::Match> FindByTournamentIdAndMatchId(const std::string_view& tournamentId, const std::string_view& matchId) = 0;
+    virtual std::shared_ptr<domain::Match> FindByTournamentIdAndName(const std::string_view& tournamentId, const std::string_view& name) = 0;
     virtual void UpdateMatchScore(const std::string_view& matchId, const domain::Score& score) = 0;
+    virtual void Update(const std::string_view& matchId, const domain::Match& match) = 0;
     virtual std::vector<std::string> CreateBulk(const std::vector<domain::Match>& matches) = 0; //agregar todos los matches de una vez
     virtual bool MatchesExistForTournament(const std::string_view& tournamentId) = 0;
 };

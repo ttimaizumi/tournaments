@@ -16,7 +16,9 @@ public:
     explicit MatchRepository(const std::shared_ptr<IDbConnectionProvider>& connectionProvider);
     std::vector<std::shared_ptr<domain::Match>> FindByTournamentId(const std::string_view& tournamentId) override;
     std::shared_ptr<domain::Match> FindByTournamentIdAndMatchId(const std::string_view& tournamentId, const std::string_view& matchId) override;
+    std::shared_ptr<domain::Match> FindByTournamentIdAndName(const std::string_view& tournamentId, const std::string_view& name) override;
     void UpdateMatchScore(const std::string_view& matchId, const domain::Score& score) override;
+    void Update(const std::string_view& matchId, const domain::Match& match) override;
     std::vector<std::string> CreateBulk(const std::vector<domain::Match>& matches) override;
     bool MatchesExistForTournament(const std::string_view& tournamentId) override;
 };

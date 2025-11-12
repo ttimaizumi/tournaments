@@ -14,11 +14,12 @@ set(TEST_SOURCES
         ../src/delegate/TeamDelegate.cpp
         ../src/delegate/TournamentDelegate.cpp
         ../src/delegate/GroupDelegate.cpp
-        ../src/delegate/BracketGenerator.cpp
+        ../../tournament_consumer/src/delegate/BracketGenerator.cpp
 )
 
 set(SOURCES ${TEST_SOURCES})
 include_directories(../include)
+include_directories(../../tournament_consumer/include)
 
 find_package(GTest CONFIG REQUIRED)
 

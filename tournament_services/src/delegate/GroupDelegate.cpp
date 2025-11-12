@@ -11,8 +11,8 @@
 #include <format>
 #include <pqxx/pqxx>
 
-GroupDelegate::GroupDelegate(const std::shared_ptr<TournamentRepository>& tournamentRepository, const std::shared_ptr<IGroupRepository>& groupRepository, const std::shared_ptr<TeamRepository>& teamRepository)
-    : tournamentRepository(tournamentRepository), groupRepository(groupRepository), teamRepository(teamRepository){}
+GroupDelegate::GroupDelegate(const std::shared_ptr<TournamentRepository>& tournamentRepository, const std::shared_ptr<IGroupRepository>& groupRepository, const std::shared_ptr<TeamRepository>& teamRepository, const std::shared_ptr<IQueueMessageProducer>& messageProducer)
+    : tournamentRepository(tournamentRepository), groupRepository(groupRepository), teamRepository(teamRepository), messageProducer(messageProducer){}
 
 std::expected<std::vector<std::shared_ptr<domain::Group>>, Error> GroupDelegate::GetGroups(const std::string_view& tournamentId) {
     // Validacion de formato de UUID para tournamentId
@@ -204,7 +204,7 @@ std::expected<void, Error> GroupDelegate::UpdateTeams(const std::string_view& to
             std::unique_ptr<nlohmann::json> message = std::make_unique<nlohmann::json>();
             message->emplace("tournamentId", tournamentId);
             message->emplace("groupId", groupId);
-            message->emplace("teamId", team.Id());
+            message->emplace("teamId", team.Id);
             messageProducer->SendMessage(message->dump(), "tournament.team-add");
         } catch (const std::exception& e) {
             return std::unexpected(Error::UNKNOWN_ERROR);

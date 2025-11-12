@@ -57,7 +57,9 @@ public:
             connectionPool.back()->prepare("insert_match", "insert into MATCHES (tournament_id, document) values($1, $2) RETURNING id");
             connectionPool.back()->prepare("select_matches_by_tournament", "select * from MATCHES where tournament_id = $1");
             connectionPool.back()->prepare("select_match_by_tournamentid_matchid", "select * from MATCHES where tournament_id = $1 and id = $2");
-            connectionPool.back()->prepare("update_match", "UPDATE MATCHES SET document = $1, last_update_date = CURRENT_TIMESTAMP WHERE id = $2 RETURNING document");
+            connectionPool.back()->prepare("select_match_by_tournamentid_name", "select * from MATCHES where tournament_id = $1 and document->>'name' = $2");
+            connectionPool.back()->prepare("update_match_score", "UPDATE MATCHES SET document = jsonb_set(document, '{score}', $2::jsonb), last_update_date = CURRENT_TIMESTAMP WHERE id = $1");
+            connectionPool.back()->prepare("update_match", "UPDATE MATCHES SET document = $2, last_update_date = CURRENT_TIMESTAMP WHERE id = $1 RETURNING document");
             connectionPool.back()->prepare("delete_match", "DELETE FROM MATCHES WHERE id = $1");
         }
     }

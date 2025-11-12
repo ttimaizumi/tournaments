@@ -76,3 +76,32 @@ bool MatchRepository::MatchesExistForTournament(const std::string_view& tourname
 
     return !result.empty();
 }
+
+std::shared_ptr<domain::Match> MatchRepository::FindByTournamentIdAndName(const std::string_view& tournamentId, const std::string_view& name) {
+    auto pooled = connectionProvider->Connection();
+    auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
+
+    pqxx::work tx(*(connection->connection));
+    pqxx::result result = tx.exec(pqxx::prepped{"select_match_by_tournamentid_name"}, pqxx::params{tournamentId.data(), name.data()});
+    tx.commit();
+    
+    if (result.empty()) {
+        return nullptr;
+    }
+    
+    nlohmann::json matchDocument = nlohmann::json::parse(result[0]["document"].c_str());
+    auto match = std::make_shared<domain::Match>(matchDocument);
+    match->Id() = result[0]["id"].c_str();
+
+    return match;
+}
+
+void MatchRepository::Update(const std::string_view& matchId, const domain::Match& match) {
+    nlohmann::json matchDocument = match;
+    auto pooled = connectionProvider->Connection();
+    const auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
+
+    pqxx::work tx(*(connection->connection));
+    tx.exec(pqxx::prepped{"update_match"}, pqxx::params{matchId.data(), matchDocument.dump()});
+    tx.commit();
+}

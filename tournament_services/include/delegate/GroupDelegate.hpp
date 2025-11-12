@@ -23,7 +23,7 @@ class GroupDelegate : public IGroupDelegate{
     std::shared_ptr<IQueueMessageProducer> messageProducer;
 
 public:
-    GroupDelegate(const std::shared_ptr<TournamentRepository>& tournamentRepository, const std::shared_ptr<IGroupRepository>& groupRepository, const std::shared_ptr<TeamRepository>& teamRepository);
+    GroupDelegate(const std::shared_ptr<TournamentRepository>& tournamentRepository, const std::shared_ptr<IGroupRepository>& groupRepository, const std::shared_ptr<TeamRepository>& teamRepository, const std::shared_ptr<IQueueMessageProducer>& messageProducer);
     std::expected<std::shared_ptr<domain::Group>, Error> GetGroup(const std::string_view& tournamentId, const std::string_view& groupId) override;
     std::expected<std::vector<std::shared_ptr<domain::Group>>, Error> GetGroups(const std::string_view& tournamentId) override;
     std::expected<std::string, Error> CreateGroup(const std::string_view& tournamentId, const domain::Group& group) override;

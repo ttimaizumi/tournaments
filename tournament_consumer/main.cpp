@@ -13,17 +13,18 @@ int main() {
         const auto container = config::containerSetup();
         std::println("after container");
 
-        std::thread tournamentCreatedThread([&] {
+        std::thread teamAddThread([&] {
             auto listener = container->resolve<GroupAddTeamListener>();
             listener->Start("tournament.team-add");
         });
-        //crear otro thread aqui
+        
+        std::thread scoreUpdateThread([&] {
+            auto listener = container->resolve<MatchScoreUpdateListener>();
+            listener->Start("tournament.score-update");
+        });
 
-        tournamentCreatedThread.join();
-        //join de otro thread aqui
-        // while (true) {
-        //     std::this_thread::sleep_for(std::chrono::seconds(5));
-        // }
+        teamAddThread.join();
+        scoreUpdateThread.join();
     }
     activemq::library::ActiveMQCPP::shutdownLibrary();
     return 0;
