@@ -3,9 +3,7 @@
 
 using nlohmann::json;
 
-static constexpr std::size_t kMaxTeamsPerGroup = 16; // Espacio en memoria
-#define MAX_TEAMS_PER_GROUP = 32 // Define hace copypaste
-
+static constexpr std::size_t kMaxTeamsPerGroup = 32;
 GroupDelegate::GroupDelegate(
     const std::shared_ptr<IRepository<domain::Tournament, std::string>>& tRepo,
     const std::shared_ptr<IGroupRepository>& gRepo,
