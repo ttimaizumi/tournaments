@@ -87,6 +87,10 @@ namespace config {
         builder.registerType<GroupRepository>()
             .singleInstance();
 
+        builder.registerType<GroupRepository>()
+            .as<IGroupRepository>()
+            .singleInstance();
+
         builder.registerType<MatchRepository>()
             .as<IMatchRepository>()
             .singleInstance();
