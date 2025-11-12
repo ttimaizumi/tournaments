@@ -1,6 +1,7 @@
 //
 // Created by tomas on 9/6/25.
 //
+
 #include <activemq/library/ActiveMQCPP.h>
 #include <print>
 #include <thread>
@@ -9,8 +10,10 @@
 #include "configuration/ContainerSetup.hpp"
 #include "cms/GroupAddTeamListener.hpp"
 #include "cms/ScoreRecordedListener.hpp"
+#include "cms/TournamentFullListener.hpp"
 
 int main() {
+    // Inicializa la librería de ActiveMQ
     activemq::library::ActiveMQCPP::initializeLibrary();
     {
         std::println("before container");
@@ -18,15 +21,17 @@ int main() {
         std::println("after container");
 
         // Resolvemos listeners desde el contenedor de dependencias
-        auto groupListener  = container->resolve<GroupAddTeamListener>();
-        auto scoreListener  = container->resolve<ScoreRecordedListener>();
+        auto groupListener = container->resolve<GroupAddTeamListener>();
+        auto scoreListener = container->resolve<ScoreRecordedListener>();
+        auto fullListener  = container->resolve<TournamentFullListener>();
 
-        // IMPORTANTE: aquí usamos los nombres de cola
-        // que sí está usando tu servicio:
-        //  - "group.team-added" lo manda GroupDelegate::UpdateTeams
-        //  - "match.score-recorded" lo manda MatchDelegate::UpdateScore
+        // IMPORTANTE: nombres de cola que usa tu servicio
+        //  - "group.team-added"  -> GroupDelegate::UpdateTeams
+        //  - "match.score-recorded" -> MatchDelegate::UpdateScore
+        //  - "tournament.full"   -> lo mandaremos cuando el torneo tenga 32 equipos
         groupListener->Start("group.team-added");
         scoreListener->Start("match.score-recorded");
+        fullListener->Start("tournament.full");
 
         std::println("[consumer] listeners started. Waiting for messages...");
 
@@ -36,7 +41,7 @@ int main() {
             std::this_thread::sleep_for(std::chrono::seconds(10));
         }
 
-        // NOTA: normalmente no se llega aquí; al salir del bloque,
+        // Normalmente no se llega aquí; al salir del bloque,
         // los destructores de los listeners llamarán Stop().
     }
     activemq::library::ActiveMQCPP::shutdownLibrary();
