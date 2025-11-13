@@ -6,8 +6,8 @@ namespace domain {
     enum class Winner { HOME, VISITOR  };
     
     struct Score {
-        int homeTeamScore;
-        int visitorTeamScore;
+        int homeTeamScore = 0;
+        int visitorTeamScore = 0;
         [[nodiscard]] Winner GetWinner() const {
             if (visitorTeamScore < homeTeamScore) {
                 return Winner::HOME;
