@@ -45,19 +45,20 @@ inline void MatchDelegate::ProcessTeamAddition(const domain::TeamAddEvent& teamA
         // Bulk insert matches into the repository
         matchRepository->CreateBulk(matches);
         
-        // Automatically play initial matches (W0-W15): visitor team wins 1-0
-        std::cout << "[MatchDelegate] Auto-playing initial matches (W0-W15)..." << std::endl;
-        for (int i = 0; i < 16; ++i) {
+        // Automatically play the entire tournament
+        std::cout << "[MatchDelegate] Auto-playing entire tournament..." << std::endl;
+        
+        // Play all winners bracket matches (W0-W30)
+        std::cout << "[MatchDelegate] Playing Winners Bracket (W0-W30)..." << std::endl;
+        for (int i = 0; i <= 30; ++i) {
             std::string matchName = "W" + std::to_string(i);
             auto match = matchRepository->FindByTournamentIdAndName(teamAddEvent.tournamentId, matchName);
-            if (match) {
-                // Update score: visitor wins 1-0
+            if (match && !match->HomeTeamId().empty() && !match->VisitorTeamId().empty()) {
                 domain::Score score;
                 score.homeTeamScore = 0;
                 score.visitorTeamScore = 1;
                 matchRepository->UpdateMatchScore(match->Id(), score);
                 
-                // Process the score update to advance teams
                 domain::ScoreUpdateEvent scoreEvent;
                 scoreEvent.tournamentId = teamAddEvent.tournamentId;
                 scoreEvent.matchId = match->Id();
@@ -68,7 +69,57 @@ inline void MatchDelegate::ProcessTeamAddition(const domain::TeamAddEvent& teamA
                 std::cout << "[MatchDelegate] " << matchName << " completed: visitor wins 1-0" << std::endl;
             }
         }
-        std::cout << "[MatchDelegate] Initial matches complete! Winners advanced to W16-W23, losers to L0-L7." << std::endl;
+        
+        // Play all losers bracket matches (L0-L29)
+        std::cout << "[MatchDelegate] Playing Losers Bracket (L0-L29)..." << std::endl;
+        for (int i = 0; i <= 29; ++i) {
+            std::string matchName = "L" + std::to_string(i);
+            auto match = matchRepository->FindByTournamentIdAndName(teamAddEvent.tournamentId, matchName);
+            if (match && !match->HomeTeamId().empty() && !match->VisitorTeamId().empty()) {
+                domain::Score score;
+                score.homeTeamScore = 0;
+                score.visitorTeamScore = 1;
+                matchRepository->UpdateMatchScore(match->Id(), score);
+                
+                domain::ScoreUpdateEvent scoreEvent;
+                scoreEvent.tournamentId = teamAddEvent.tournamentId;
+                scoreEvent.matchId = match->Id();
+                scoreEvent.homeTeamScore = 0;
+                scoreEvent.visitorTeamScore = 1;
+                ProcessScoreUpdate(scoreEvent);
+                
+                std::cout << "[MatchDelegate] " << matchName << " completed: visitor wins 1-0" << std::endl;
+            }
+        }
+        
+        // Play finals (F0 and possibly F1)
+        std::cout << "[MatchDelegate] Playing Finals (F0-F1)..." << std::endl;
+        for (int i = 0; i <= 1; ++i) {
+            std::string matchName = "F" + std::to_string(i);
+            auto match = matchRepository->FindByTournamentIdAndName(teamAddEvent.tournamentId, matchName);
+            if (match && !match->HomeTeamId().empty() && !match->VisitorTeamId().empty()) {
+                domain::Score score;
+                score.homeTeamScore = 0;
+                score.visitorTeamScore = 1;
+                matchRepository->UpdateMatchScore(match->Id(), score);
+                
+                domain::ScoreUpdateEvent scoreEvent;
+                scoreEvent.tournamentId = teamAddEvent.tournamentId;
+                scoreEvent.matchId = match->Id();
+                scoreEvent.homeTeamScore = 0;
+                scoreEvent.visitorTeamScore = 1;
+                ProcessScoreUpdate(scoreEvent);
+                
+                std::cout << "[MatchDelegate] " << matchName << " completed: visitor wins 1-0" << std::endl;
+                
+                // Print tournament winner after final match
+                if (i == 1 || (i == 0 && matchName == "F0")) {
+                    std::cout << "TOURNAMENT WINNER: " << match->VisitorTeamId() << std::endl;
+                
+            }
+        }
+        
+        std::cout << "[MatchDelegate] TOURNAMENT COMPLETE! Winner determined." << std::endl;
     }
     std::cout << teamAddEvent.tournamentId << " wait for teams, current teams: " << (group ? group->Teams().size() : 0) << std::endl;
 }
