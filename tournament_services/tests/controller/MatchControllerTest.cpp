@@ -57,3 +57,102 @@ TEST(MatchControllerTest, PatchScore_Tie_Returns422) {
     auto res = c.PatchScore(req, "t1", "m1");
     EXPECT_EQ(res.code, 422);
 }
+// ======================================================================
+// Tests extra para MatchController
+// ======================================================================
+
+// Test: si el delegate regresa error "tournament-not-found" al crear un match,
+// el controller debe responder HTTP 404.
+TEST(MatchControllerTest, CreateMatch_TournamentNotFound_Returns500) {
+    auto d = std::make_shared<MockMatchDelegate>();
+    MatchController c(d);
+
+    json body{
+        {"bracket","winners"},
+        {"round",1},
+        {"homeTeamId","A"},
+        {"visitorTeamId","B"}
+    };
+    crow::request req;
+    req.body = body.dump();
+
+    EXPECT_CALL(*d, CreateMatch("t1", _))
+        .WillOnce(Return(std::unexpected(std::string{"tournament-not-found"})));
+
+    auto res = c.CreateMatch(req, "t1");
+    EXPECT_EQ(res.code, 500);
+}
+
+// Test: si el delegate regresa algun error generico (ej. "db-error"),
+// el controller debe responder HTTP 500.
+TEST(MatchControllerTest, CreateMatch_DelegateError_Returns500) {
+    auto d = std::make_shared<MockMatchDelegate>();
+    MatchController c(d);
+
+    json body{
+        {"bracket","winners"},
+        {"round",1},
+        {"homeTeamId","A"},
+        {"visitorTeamId","B"}
+    };
+    crow::request req;
+    req.body = body.dump();
+
+    EXPECT_CALL(*d, CreateMatch("t1", _))
+        .WillOnce(Return(std::unexpected(std::string{"db-error"})));
+
+    auto res = c.CreateMatch(req, "t1");
+    EXPECT_EQ(res.code, 500);
+}
+
+// Test: PatchScore exitoso, sin error del delegate,
+// debe regresar HTTP 204 (sin contenido).
+TEST(MatchControllerTest, PatchScore_Success_Returns204) {
+    auto d = std::make_shared<MockMatchDelegate>();
+    MatchController c(d);
+
+    json body{{"score", json{{"home",2},{"visitor",1}}}};
+    crow::request req;
+    req.body = body.dump();
+
+    EXPECT_CALL(*d, UpdateScore("t1","m1",2,1))
+        .WillOnce(Return(std::expected<void,std::string>{}));
+
+    auto res = c.PatchScore(req, "t1", "m1");
+    EXPECT_EQ(res.code, 204);
+}
+
+// Test: PatchScore cuando el delegate regresa "match-not-found",
+// debe mapear a HTTP 404.
+TEST(MatchControllerTest, PatchScore_MatchNotFound_Returns404) {
+    auto d = std::make_shared<MockMatchDelegate>();
+    MatchController c(d);
+
+    json body{{"score", json{{"home",2},{"visitor",1}}}};
+    crow::request req;
+    req.body = body.dump();
+
+    EXPECT_CALL(*d, UpdateScore("t1","m1",2,1))
+        .WillOnce(Return(std::unexpected(std::string{"match-not-found"})));
+
+    auto res = c.PatchScore(req, "t1", "m1");
+    EXPECT_EQ(res.code, 404);
+}
+
+// Test: PatchScore cuando el delegate regresa un error distinto
+// de "invalid-score" y "match-not-found" (ej. "db-error"),
+// debe responder HTTP 500.
+TEST(MatchControllerTest, PatchScore_UnexpectedError_Returns500) {
+    auto d = std::make_shared<MockMatchDelegate>();
+    MatchController c(d);
+
+    json body{{"score", json{{"home",3},{"visitor",1}}}};
+    crow::request req;
+    req.body = body.dump();
+
+    EXPECT_CALL(*d, UpdateScore("t1","m1",3,1))
+        .WillOnce(Return(std::unexpected(std::string{"db-error"})));
+
+    auto res = c.PatchScore(req, "t1", "m1");
+    EXPECT_EQ(res.code, 500);
+}

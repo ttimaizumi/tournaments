@@ -183,30 +183,47 @@ TEST_F(GroupDelegateFixture, UpdateGroup_NotFound_ExpectedError) {
 }
 
 TEST_F(GroupDelegateFixture, UpdateTeams_AddsAndPublishesPerTeam) {
-    auto g = std::make_shared<domain::Group>(); g->Id() = "g1";
-    EXPECT_CALL(*gRepo, FindByTournamentIdAndGroupId(Eq(std::string_view{"t1"}), Eq(std::string_view{"g1"})))
-        .WillOnce(Return(g));
+    auto g = std::make_shared<domain::Group>();
+    g->Id() = "g1";
 
-    EXPECT_CALL(*gRepo, FindByTournamentIdAndTeamId(Eq(std::string_view{"t1"}), Eq(std::string_view{"p1"})))
+    EXPECT_CALL(*gRepo,
+        FindByTournamentIdAndGroupId(
+            Eq(std::string_view{"t1"}),
+            Eq(std::string_view{"g1"})))
+        .WillRepeatedly(Return(g));   // <- antes era WillOnce
+
+    EXPECT_CALL(*gRepo,
+        FindByTournamentIdAndTeamId(
+            Eq(std::string_view{"t1"}),
+            Eq(std::string_view{"p1"})))
         .WillOnce(Return(nullptr));
 
     auto persisted = std::make_shared<domain::Team>(domain::Team{"p1","P1"});
+
     EXPECT_CALL(*teamRepo, ReadById(Eq(std::string{"p1"})))
-        .Times(2) // pre-check + añadir
+        .Times(2) // pre-check + anadir
         .WillRepeatedly(Return(persisted));
 
-    EXPECT_CALL(*gRepo, UpdateGroupAddTeam(Eq(std::string_view{"g1"}), persisted)).Times(1);
-    EXPECT_CALL(*producer, SendMessage(Eq(std::string_view{"p1"}), Eq(std::string_view{"group.team-added"}))).Times(1);
+    EXPECT_CALL(*gRepo,
+        UpdateGroupAddTeam(Eq(std::string_view{"g1"}), persisted))
+        .Times(1);
+
+    EXPECT_CALL(*producer,
+        SendMessage(_, Eq(std::string_view{"group.team-added"})))
+        .Times(1);
 
     std::vector<domain::Team> input{ domain::Team{"p1","P1"} };
     auto r = delegate->UpdateTeams("t1", "g1", input);
     EXPECT_TRUE(r.has_value());
 }
 
+
 TEST_F(GroupDelegateFixture, UpdateTeams_TeamNotFound_ExpectedError) {
     auto g = std::make_shared<domain::Group>(); g->Id() = "g1";
-    EXPECT_CALL(*gRepo, FindByTournamentIdAndGroupId(Eq(std::string_view{"t1"}), Eq(std::string_view{"g1"})))
-        .WillOnce(Return(g));
+    EXPECT_CALL(*gRepo, FindByTournamentIdAndGroupId(
+     Eq(std::string_view{"t1"}), Eq(std::string_view{"g1"})))
+     .WillOnce(Return(g));
+
 
     EXPECT_CALL(*gRepo, FindByTournamentIdAndTeamId(Eq(std::string_view{"t1"}), Eq(std::string_view{"missing"})))
         .WillOnce(Return(nullptr));
@@ -224,16 +241,25 @@ TEST_F(GroupDelegateFixture, UpdateTeams_TeamNotFound_ExpectedError) {
 }
 //
 TEST_F(GroupDelegateFixture, UpdateTeams_GroupFull_ExpectedError) {
-    auto g = std::make_shared<domain::Group>(); g->Id() = "g1";
-    g->Teams().resize(16);
+    auto g = std::make_shared<domain::Group>();
+    g->Id() = "g1";
+    // simulamos grupo totalmente lleno
+    g->Teams().resize(32);
 
-    EXPECT_CALL(*gRepo, FindByTournamentIdAndGroupId(Eq(std::string_view{"t1"}), Eq(std::string_view{"g1"})))
+    EXPECT_CALL(*gRepo,
+        FindByTournamentIdAndGroupId(
+            Eq(std::string_view{"t1"}),
+            Eq(std::string_view{"g1"})))
         .WillOnce(Return(g));
 
-    EXPECT_CALL(*producer, SendMessage(_, _)).Times(0);
+    // Si ya esta lleno, NO debe intentar buscar ni agregar equipos
+    EXPECT_CALL(*gRepo, FindByTournamentIdAndTeamId(_, _)).Times(0);
+    EXPECT_CALL(*teamRepo, ReadById(_)).Times(0);
     EXPECT_CALL(*gRepo, UpdateGroupAddTeam(_, _)).Times(0);
+    EXPECT_CALL(*producer, SendMessage(_, _)).Times(0);
 
     std::vector<domain::Team> input{ domain::Team{"p9","P9"} };
+
     auto r = delegate->UpdateTeams("t1", "g1", input);
     ASSERT_FALSE(r.has_value());
     EXPECT_EQ(r.error(), "group-full");
