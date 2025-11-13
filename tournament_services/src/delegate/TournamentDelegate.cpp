@@ -16,18 +16,16 @@ TournamentDelegate::TournamentDelegate(
     std::shared_ptr<IQueueMessageProducer> producerIn)
     : tournamentRepository(std::move(repository)), producer(std::move(producerIn)) {}
 
-// existente: crea y retorna id (cadena vacia si fallo)
 std::string TournamentDelegate::CreateTournament(std::shared_ptr<domain::Tournament> tournament) {
     auto tp = std::move(tournament);
     std::string id = tournamentRepository->Create(*tp);
 
     if (!id.empty() && producer) {
-        producer->SendMessage(std::string_view{id}, std::string_view{"tournament.created"});
+        producer->SendMessage(id, "tournament.created");
     }
     return id;
 }
 
-// nuevo: crea y retorna expected<string,string>
 std::expected<std::string, std::string>
 TournamentDelegate::CreateTournamentEx(std::shared_ptr<domain::Tournament> tournament) {
     auto tp = std::move(tournament);
@@ -36,7 +34,7 @@ TournamentDelegate::CreateTournamentEx(std::shared_ptr<domain::Tournament> tourn
         return std::unexpected(std::string{"conflict"});
     }
     if (producer) {
-        producer->SendMessage(std::string_view{id}, std::string_view{"tournament.created"});
+        producer->SendMessage(id, "tournament.created");
     }
     return id;
 }
@@ -49,7 +47,6 @@ std::shared_ptr<domain::Tournament> TournamentDelegate::ReadById(const std::stri
     return tournamentRepository->ReadById(std::string{id});
 }
 
-// existente: bool (true si Update retorna id no vacio)
 bool TournamentDelegate::UpdateTournament(const domain::Tournament& t) {
     auto existing = tournamentRepository->ReadById(t.Id());
     if (!existing) return false;
@@ -57,7 +54,6 @@ bool TournamentDelegate::UpdateTournament(const domain::Tournament& t) {
     return !updatedId.empty();
 }
 
-// nuevo: expected<void,string> con error "not found" si no existe
 std::expected<void, std::string>
 TournamentDelegate::UpdateTournamentEx(const domain::Tournament& base,
                                        const std::string& id,
@@ -72,7 +68,6 @@ TournamentDelegate::UpdateTournamentEx(const domain::Tournament& base,
 
     auto updatedId = tournamentRepository->Update(t);
     if (updatedId.empty()) {
-        // no lo exige el requerimiento, pero es un posible error extra
         return std::unexpected(std::string{"update failed"});
     }
     return {};

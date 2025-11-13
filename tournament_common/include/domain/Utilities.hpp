@@ -155,6 +155,45 @@ namespace domain {
         }
         json["teams"] = group.Teams();
     }
+    // Score -> json
+    inline void to_json(nlohmann::json& j, const Score& s)
+    {
+        j = {
+            {"home",    s.homeTeamScore},
+            {"visitor", s.visitorTeamScore}
+        };
+    }
+
+    // json -> Score
+    inline void from_json(const nlohmann::json& j, Score& s)
+    {
+        j.at("home").get_to(s.homeTeamScore);
+        j.at("visitor").get_to(s.visitorTeamScore);
+    }
+
+    // Match -> json (solo ids y score; los nombres los armara el servicio)
+    inline void to_json(nlohmann::json& j, const Match& m)
+    {
+        j["homeTeamId"]    = m.HomeTeamId();
+        j["visitorTeamId"] = m.VisitorTeamId();
+        j["score"]         = m.MatchScore();
+    }
+
+    // json -> Match
+    inline void from_json(const nlohmann::json& j, Match& m)
+    {
+        if (j.contains("homeTeamId"))
+            j.at("homeTeamId").get_to(m.HomeTeamId());
+
+        if (j.contains("visitorTeamId"))
+            j.at("visitorTeamId").get_to(m.VisitorTeamId());
+
+        if (j.contains("score"))
+            j.at("score").get_to(m.MatchScore());
+    }
+
 }
+
+
 
 #endif /* FC7CD637_41CC_48DE_8D8A_BC2CFC528D72 */

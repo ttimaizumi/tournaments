@@ -7,7 +7,7 @@ class IQueueMessageProducer
 {
 public:
     virtual ~IQueueMessageProducer() = default;
-    virtual void SendMessage(const std::string_view& message, const std::string_view& queue) = 0;
+    virtual void SendMessage(const std::string& message, const std::string& queue) = 0;
 };
  
 
