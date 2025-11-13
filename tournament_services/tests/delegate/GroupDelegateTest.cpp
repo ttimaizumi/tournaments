@@ -57,8 +57,11 @@ struct MockTeamRepo : IRepository<domain::Team, std::string_view> {
     MOCK_METHOD(void, Delete, (std::string_view id), (override));
 };
 
-struct MockProducer : IQueueMessageProducer {
-    MOCK_METHOD(void, SendMessage, (const std::string_view& message, const std::string_view& queue), (override));
+class MockProducer : public IQueueMessageProducer {
+public:
+    MOCK_METHOD(void, SendMessage,
+                (const std::string& message, const std::string& queue),
+                (override));
 };
 
 class GroupDelegateFixture : public ::testing::Test {

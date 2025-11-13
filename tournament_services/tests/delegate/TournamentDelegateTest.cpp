@@ -28,9 +28,13 @@ struct MockTournamentRepository : IRepository<domain::Tournament, std::string> {
 };
 
 // Mock del productor de mensajes via la interfaz (no la clase concreta)
-struct MockQueueMessageProducer : IQueueMessageProducer {
-    MOCK_METHOD(void, SendMessage, (const std::string_view& message, const std::string_view& queue), (override));
+class MockQueueMessageProducer : public IQueueMessageProducer {
+public:
+    MOCK_METHOD(void, SendMessage,
+                (const std::string& message, const std::string& queue),
+                (override));
 };
+
 
 class TournamentDelegateFixture : public ::testing::Test {
 protected:

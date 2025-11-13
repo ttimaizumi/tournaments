@@ -32,8 +32,10 @@ public:
 class MockProducer : public IQueueMessageProducer {
 public:
     MOCK_METHOD(void, SendMessage,
-        (const std::string_view&, const std::string_view&), (override));
+                (const std::string& message, const std::string& queue),
+                (override));
 };
+
 
 TEST(MatchDelegateTest, CreateMatch_SendsCreatedEvent) {
     auto repo = std::make_shared<MockMatchRepository>();
