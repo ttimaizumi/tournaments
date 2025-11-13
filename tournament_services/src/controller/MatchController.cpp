@@ -62,18 +62,18 @@ crow::response MatchController::updateMatchScore(const crow::request& request, c
 
   auto requestBody = nlohmann::json::parse(request.body);
 
-  // Basic JSON shape validation for matchScore
-  if (!requestBody.contains("matchScore") || !requestBody["matchScore"].is_object()) {
+  // Basic JSON shape validation for score
+  if (!requestBody.contains("score") || !requestBody["score"].is_object()) {
     response.code = crow::BAD_REQUEST;
-    response.body = "Missing or invalid matchScore object";
+    response.body = "Missing or invalid score object";
     return response;
   }
 
-  auto& scoreJson = requestBody["matchScore"];
+  auto& scoreJson = requestBody["score"];
   if (!scoreJson.contains("homeTeamScore") || !scoreJson.contains("visitorTeamScore") ||
       !scoreJson["homeTeamScore"].is_number_integer() || !scoreJson["visitorTeamScore"].is_number_integer()) {
     response.code = crow::BAD_REQUEST;
-    response.body = "matchScore must contain integer homeTeamScore and visitorTeamScore";
+    response.body = "score must contain integer homeTeamScore and visitorTeamScore";
     return response;
   }
 
