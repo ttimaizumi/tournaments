@@ -11,6 +11,7 @@
 #include "event/TeamAddEvent.hpp"
 #include "event/ScoreUpdateEvent.hpp"
 #include "delegate/BracketGenerator.hpp"
+#include "domain/Match.hpp"
 #include "persistence/repository/GroupRepository.hpp"
 #include "persistence/repository/IMatchRepository.hpp"
 
@@ -43,6 +44,31 @@ inline void MatchDelegate::ProcessTeamAddition(const domain::TeamAddEvent& teamA
         auto matches = bracketGenerator->GenerateMatches(teamAddEvent.tournamentId, group->Teams());
         // Bulk insert matches into the repository
         matchRepository->CreateBulk(matches);
+        
+        // Automatically play initial matches (W0-W15): visitor team wins 1-0
+        std::cout << "[MatchDelegate] Auto-playing initial matches (W0-W15)..." << std::endl;
+        for (int i = 0; i < 16; ++i) {
+            std::string matchName = "W" + std::to_string(i);
+            auto match = matchRepository->FindByTournamentIdAndName(teamAddEvent.tournamentId, matchName);
+            if (match) {
+                // Update score: visitor wins 1-0
+                domain::Score score;
+                score.homeTeamScore = 0;
+                score.visitorTeamScore = 1;
+                matchRepository->UpdateMatchScore(match->Id(), score);
+                
+                // Process the score update to advance teams
+                domain::ScoreUpdateEvent scoreEvent;
+                scoreEvent.tournamentId = teamAddEvent.tournamentId;
+                scoreEvent.matchId = match->Id();
+                scoreEvent.homeTeamScore = 0;
+                scoreEvent.visitorTeamScore = 1;
+                ProcessScoreUpdate(scoreEvent);
+                
+                std::cout << "[MatchDelegate] " << matchName << " completed: visitor wins 1-0" << std::endl;
+            }
+        }
+        std::cout << "[MatchDelegate] Initial matches complete! Winners advanced to W16-W23, losers to L0-L7." << std::endl;
     }
     std::cout << teamAddEvent.tournamentId << " wait for teams, current teams: " << (group ? group->Teams().size() : 0) << std::endl;
 }
