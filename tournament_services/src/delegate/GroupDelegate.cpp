@@ -87,11 +87,20 @@ std::expected<std::string, Error> GroupDelegate::CreateGroup(const std::string_v
             if (team == nullptr) {
                 return std::unexpected(Error::NOT_FOUND);
             }
-            // validacion de name vacio? validacion de name coincidente al id en db ?
         }
     }
+    
     try {
         auto id = groupRepository->Create(g);
+        
+        if (!g.Teams().empty()) {
+            std::unique_ptr<nlohmann::json> message = std::make_unique<nlohmann::json>();
+            message->emplace("tournamentId", tournamentId);
+            message->emplace("groupId", id);
+            message->emplace("teamId", ""); 
+            messageProducer->SendMessage(message->dump(), "tournament.team-add");
+        }
+        
         return id;
     } catch (const pqxx::unique_violation& e) {
         // Validacion de duplicado
