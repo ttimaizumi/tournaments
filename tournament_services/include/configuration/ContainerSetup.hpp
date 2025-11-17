@@ -27,6 +27,12 @@
 #include "delegate/IGroupDelegate.hpp"
 #include "delegate/GroupDelegate.hpp"
 #include "controller/GroupController.hpp"
+#include "delegate/ITournamentDelegate.hpp"
+#include "delegate/IMatchDelegate.hpp"
+#include "delegate/MatchDelegate.hpp"
+#include "persistence/repository/IMatchRepository.hpp"
+#include "persistence/repository/MatchRepository.hpp"
+#include "controller/MatchController.hpp"
 
 namespace config {
     inline std::shared_ptr<Hypodermic::Container> containerSetup() {
@@ -49,7 +55,14 @@ namespace config {
             })
             .singleInstance();
 
-        builder.registerType<QueueMessageProducer>().as<IQueueMessageProducer>().named("tournamentAddTeamQueue");
+        builder.registerType<QueueMessageProducer>()
+            .as<IQueueMessageProducer>()
+            .named("tournamentAddTeamQueue")
+            .singleInstance();
+        builder.registerType<QueueMessageProducer>()
+            .as<IQueueMessageProducer>()
+            .named("tournamentScoreUpdateQueue")
+            .singleInstance();
         builder.registerType<QueueResolver>().as<IResolver<IQueueMessageProducer> >().named("queueResolver").
                 singleInstance();
 
@@ -63,8 +76,8 @@ namespace config {
                 singleInstance();
 
         builder.registerType<TournamentDelegate>()
-                .as<ITournamentDelegate>()
-                .singleInstance();
+               .as<ITournamentDelegate>()
+               .singleInstance();
         builder.registerType<TournamentController>().singleInstance();
 
         builder.registerType<GroupDelegate>().as<IGroupDelegate>()
@@ -74,6 +87,14 @@ namespace config {
             .singleInstance();
         builder.registerType<GroupController>().singleInstance();
         builder.registerType<HealthController>().singleInstance();
+
+        builder.registerType<MatchRepository>().as<IMatchRepository>().singleInstance();
+        builder.registerType<MatchDelegate>().as<IMatchDelegate>()
+            .with<IQueueMessageProducer>([](Hypodermic::ComponentContext& context){
+                return context.resolveNamed<QueueMessageProducer>("tournamentScoreUpdateQueue");
+            })
+            .singleInstance();
+        builder.registerType<MatchController>().singleInstance();
 
         return builder.build();
     }

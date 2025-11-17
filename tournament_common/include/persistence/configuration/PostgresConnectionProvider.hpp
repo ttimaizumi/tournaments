@@ -24,10 +24,12 @@ public:
             connectionPool.push(std::make_unique<pqxx::connection>(connectionString.data()));
             connectionPool.back()->prepare("insert_tournament", "insert into TOURNAMENTS (document) values($1) RETURNING id");
             connectionPool.back()->prepare("select_tournament_by_id", "select * from TOURNAMENTS where id = $1");
-
+            connectionPool.back()->prepare("update_tournament", "UPDATE TOURNAMENTS SET document = document || $1::jsonb WHERE id = $2 RETURNING document");
+            connectionPool.back()->prepare("delete_tournament", "DELETE FROM TOURNAMENTS WHERE id = $1");
             connectionPool.back()->prepare("insert_team", "insert into TEAMS (document) values($1) RETURNING id");
             connectionPool.back()->prepare("select_team_by_id", "select * from TEAMS where id = $1");
-
+            connectionPool.back()->prepare("update_team", "UPDATE TEAMS SET document = document || $1::jsonb WHERE id = $2 RETURNING document");
+            connectionPool.back()->prepare("delete_team", "DELETE FROM TEAMS WHERE id = $1");
             connectionPool.back()->prepare("insert_group", "insert into GROUPS (tournament_id, document) values($1, $2) RETURNING id");
             connectionPool.back()->prepare("select_groups_by_tournament", "select * from GROUPS where tournament_id = $1");
             connectionPool.back()->prepare("select_group_in_tournament", R"(
@@ -37,7 +39,12 @@ public:
             )");
 
             connectionPool.back()->prepare("select_group_by_tournamentid_groupid", "select * from GROUPS where tournament_id = $1 and id = $2");
-            // connectionPool.back()->prepare("update_group", "update GROUPS set name = $2, last_update_date = CURRENT_TIMESTAMP where id = $1  RETURNING id");
+            connectionPool.back()->prepare("select_group_by_group_id_team_id", R"(
+                select * from groups
+                where id = $1
+                and document @> jsonb_build_object('teams', jsonb_build_array(jsonb_build_object('id', $2::text)))
+            )");
+            connectionPool.back()->prepare("update_group", "UPDATE GROUPS SET document = $2, last_update_date = CURRENT_TIMESTAMP WHERE id = $1 RETURNING document");
             connectionPool.back()->prepare("update_group_add_team", R"(
                 update groups
                     set document = jsonb_insert(
@@ -46,6 +53,14 @@ public:
                     last_update_date = CURRENT_TIMESTAMP
                 where id = $1
             )");
+            connectionPool.back()->prepare("delete_group", "DELETE FROM GROUPS WHERE id = $1 RETURNING id");
+            connectionPool.back()->prepare("insert_match", "insert into MATCHES (tournament_id, document) values($1, $2) RETURNING id");
+            connectionPool.back()->prepare("select_matches_by_tournament", "select * from MATCHES where tournament_id = $1");
+            connectionPool.back()->prepare("select_match_by_tournamentid_matchid", "select * from MATCHES where tournament_id = $1 and id = $2");
+            connectionPool.back()->prepare("select_match_by_tournamentid_name", "select * from MATCHES where tournament_id = $1 and document->>'name' = $2");
+            connectionPool.back()->prepare("update_match_score", "UPDATE MATCHES SET document = jsonb_set(document, '{score}', $2::jsonb), last_update_date = CURRENT_TIMESTAMP WHERE id = $1");
+            connectionPool.back()->prepare("update_match", "UPDATE MATCHES SET document = $2, last_update_date = CURRENT_TIMESTAMP WHERE id = $1 RETURNING document");
+            connectionPool.back()->prepare("delete_match", "DELETE FROM MATCHES WHERE id = $1");
         }
     }
 

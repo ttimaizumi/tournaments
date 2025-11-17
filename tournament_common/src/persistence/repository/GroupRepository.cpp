@@ -7,6 +7,26 @@
 
 GroupRepository::GroupRepository(const std::shared_ptr<IDbConnectionProvider>& connectionProvider) : connectionProvider(std::move(connectionProvider)) {}
 
+std::vector<std::shared_ptr<domain::Group>> GroupRepository::FindByTournamentId(const std::string_view& tournamentId) {
+    auto pooled = connectionProvider->Connection();
+    auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
+
+    pqxx::work tx(*(connection->connection));
+    pqxx::result result = tx.exec(pqxx::prepped{"select_groups_by_tournament"}, pqxx::params{tournamentId.data()});
+    tx.commit();
+
+    std::vector<std::shared_ptr<domain::Group>> groups;
+    for(auto row : result){
+        nlohmann::json groupDocument = nlohmann::json::parse(row["document"].c_str());
+        auto group = std::make_shared<domain::Group>(groupDocument);
+        group->Id() = row["id"].c_str();
+
+        groups.push_back(group);
+    }
+
+    return groups;
+}
+
 std::shared_ptr<domain::Group> GroupRepository::ReadById(std::string id) {
     return std::make_shared<domain::Group>();
 }
@@ -18,9 +38,8 @@ std::string GroupRepository::Create (const domain::Group & entity) {
 
     pqxx::work tx(*(connection->connection));
     pqxx::result result = tx.exec(pqxx::prepped{"insert_group"}, pqxx::params{entity.TournamentId(), groupBody.dump()});
-
     tx.commit();
-
+    
     return result[0]["id"].c_str();
 }
 
@@ -38,7 +57,13 @@ std::string GroupRepository::Update (const domain::Group & entity) {
 }
 
 void GroupRepository::Delete(std::string id) {
+    auto pooled = connectionProvider->Connection();
+    auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
 
+    pqxx::work tx(*(connection->connection));
+    pqxx::result result = tx.exec(pqxx::prepped{"delete_group"}, pqxx::params{id});
+
+    tx.commit();
 }
 
 std::vector<std::shared_ptr<domain::Group>> GroupRepository::ReadAll() {
@@ -58,26 +83,6 @@ std::vector<std::shared_ptr<domain::Group>> GroupRepository::ReadAll() {
     return teams;
 }
 
-std::vector<std::shared_ptr<domain::Group>> GroupRepository::FindByTournamentId(const std::string_view& tournamentId) {
-    auto pooled = connectionProvider->Connection();
-    auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
-
-    pqxx::work tx(*(connection->connection));
-    pqxx::result result = tx.exec(pqxx::prepped{"select_groups_by_tournament"}, pqxx::params{tournamentId.data()});
-    tx.commit();
-
-    std::vector<std::shared_ptr<domain::Group>> groups;
-    for(auto row : result){
-        nlohmann::json groupDocument = nlohmann::json::parse(row["document"].c_str());
-        auto group = std::make_shared<domain::Group>(groupDocument);
-        group->Id() = result[0]["id"].c_str();
-
-        groups.push_back(group);
-    }
-
-    return groups;
-}
-
 std::shared_ptr<domain::Group> GroupRepository::FindByTournamentIdAndGroupId(const std::string_view& tournamentId, const std::string_view& groupId) {
     auto pooled = connectionProvider->Connection();
     auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
@@ -85,6 +90,9 @@ std::shared_ptr<domain::Group> GroupRepository::FindByTournamentIdAndGroupId(con
     pqxx::work tx(*(connection->connection));
     pqxx::result result = tx.exec(pqxx::prepped{"select_group_by_tournamentid_groupid"}, pqxx::params{tournamentId.data(), groupId.data()});
     tx.commit();
+    if (result.empty()) {
+        return nullptr;
+    }
     nlohmann::json groupDocument = nlohmann::json::parse(result[0]["document"].c_str());
     auto group = std::make_shared<domain::Group>(groupDocument);
     group->Id() = result[0]["id"].c_str();
@@ -106,6 +114,25 @@ std::shared_ptr<domain::Group> GroupRepository::FindByTournamentIdAndTeamId(cons
     std::shared_ptr<domain::Group> group = std::make_shared<domain::Group>(groupDocument);
     group->Id() = result[0]["id"].c_str();
 
+    return group;
+}
+
+std::shared_ptr<domain::Group> GroupRepository::FindByGroupIdAndTeamId(const std::string_view& groupId, const std::string_view& teamId) {
+    auto pooled = connectionProvider->Connection();
+    const auto connection = dynamic_cast<PostgresConnection*>(&*pooled);
+
+    pqxx::work tx(*(connection->connection));
+    const pqxx::result result = tx.exec(pqxx::prepped{"select_group_by_group_id_team_id"}, pqxx::params{groupId.data(), teamId.data()});
+    tx.commit();
+    
+    if (result.empty()) {
+        return nullptr;
+    }
+    
+    nlohmann::json groupDocument = nlohmann::json::parse(result[0]["document"].c_str());
+    std::shared_ptr<domain::Group> group = std::make_shared<domain::Group>(groupDocument);
+    group->Id() = result[0]["id"].c_str();
+    
     return group;
 }
 

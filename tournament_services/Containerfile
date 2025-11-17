@@ -11,7 +11,7 @@ RUN chmod 777 -R /opt/vcpkg
 RUN /opt/vcpkg/bootstrap-vcpkg.sh
 RUN export VCPKG_BINARY_SOURCES="clear;files,/opt/vcpkg/binary-cache,readwrite"
 
-RUN git clone --depth 1 https://github.com/ttimaizumi/tournaments.git /root/tournaments
+RUN git clone --depth 1 https://github.com/nicosept/tournaments.git /root/tournaments
 
 # Set working directory for build
 WORKDIR /root/tournaments

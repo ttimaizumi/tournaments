@@ -2,8 +2,11 @@ project(tournament_common)
 
 set(CMAKE_CXX_STANDARD 23)
 set(COMMON_SOURCES
+        src/persistence/repository/TeamRepository.cpp
         src/persistence/repository/TournamentRepository.cpp
         src/persistence/repository/GroupRepository.cpp
+        src/persistence/repository/MatchRepository.cpp
+        include/exception/Error.hpp
 )
 
 include_directories(include)

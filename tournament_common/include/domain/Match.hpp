@@ -4,9 +4,10 @@
 #include <string>
 namespace domain {
     enum class Winner { HOME, VISITOR  };
+    
     struct Score {
-        int homeTeamScore;
-        int visitorTeamScore;
+        int homeTeamScore = 0;
+        int visitorTeamScore = 0;
         [[nodiscard]] Winner GetWinner() const {
             if (visitorTeamScore < homeTeamScore) {
                 return Winner::HOME;
@@ -14,17 +15,43 @@ namespace domain {
             return Winner::VISITOR;
         }
     };
+    
     class Match {
         /* data */
+        std::string id;
+        std::string name; // e.g., "W0", "W1", "L0", "L1", "F0", "F1"
+        std::string tournamentId;
         std::string homeTeamId;
         std::string visitorTeamId;
         Score score;
 
-        //winner's next match
-        //loser's next match
-
     public:
         Match(/* args */){}
+
+        [[nodiscard]] std::string Id() const {
+            return  id;
+        }
+
+        std::string& Id() {
+            return  id;
+        }
+
+        [[nodiscard]] std::string Name() const {
+            return name;
+        }
+
+        std::string& Name() {
+            return name;
+        }
+
+        [[nodiscard]] std::string TournamentId() const {
+            return  tournamentId;
+        }
+
+        [[nodiscard]] std::string & TournamentId() {
+            return  tournamentId;
+        }
+
         [[nodiscard]] std::string HomeTeamId() const {
             return homeTeamId;
         }
