@@ -16,7 +16,7 @@ int main() {
 
     auto appConfig = container->resolve<config::RunConfiguration>();
 
-    app.port(appConfig->port)
+    app.port(appConfig->port)b
         .concurrency(appConfig->concurrency)
         .run();
     activemq::library::ActiveMQCPP::shutdownLibrary();
