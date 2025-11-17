@@ -191,7 +191,6 @@ inline std::string MatchDelegate::GetWinnerNextMatch(const std::string& matchNam
     // Finals (F0)
     if (matchName == "F0") {
         // If loser bracket wins, go to F1 (bracket reset)
-        // This needs special handling based on who wins
         return ""; // F0 winner wins tournament (unless from losers bracket)
     }
     
@@ -204,11 +203,11 @@ inline std::string MatchDelegate::GetWinnerNextMatch(const std::string& matchNam
 }
 
 inline std::string MatchDelegate::GetLoserNextMatch(const std::string& matchName) {
-    // Winners bracket losers go to losers bracket
+
     if (matchName[0] == 'W') {
         int matchNum = std::stoi(matchName.substr(1));
         
-        // W0-W15 losers -> L0-L7 (pair them up)
+        // W0-W15 losers -> L0-L7
         if (matchNum >= 0 && matchNum <= 15) {
             // W0,W1 -> L0, W2,W3 -> L1, etc.
             return "L" + std::to_string(matchNum / 2);
@@ -217,15 +216,15 @@ inline std::string MatchDelegate::GetLoserNextMatch(const std::string& matchName
         if (matchNum >= 16 && matchNum <= 23) {
             return "L" + std::to_string(8 + (matchNum - 16));
         }
-        // W24-W27 losers -> L16-L19
+        // W24-W27 losers -> L20-L23
         if (matchNum >= 24 && matchNum <= 27) {
-            return "L" + std::to_string(16 + (matchNum - 24));
+            return "L" + std::to_string(20 + (matchNum - 24));
         }
-        // W28-W29 losers -> L22-L23
+        // W28-W29 losers -> L26-L27
         if (matchNum >= 28 && matchNum <= 29) {
-            return "L" + std::to_string(22 + (matchNum - 28));
+            return "L" + std::to_string(26 + (matchNum - 28));
         }
-        // W30 loser -> L29 (faces L28 winner in losers bracket final)
+        // W30 loser -> L29
         if (matchNum == 30) {
             return "L29";
         }
@@ -238,8 +237,6 @@ inline std::string MatchDelegate::GetLoserNextMatch(const std::string& matchName
     
     // Finals losers
     if (matchName == "F0") {
-        // If winners bracket rep loses, they're eliminated (single elimination from winners)
-        // If losers bracket rep loses, they're eliminated
         return ""; // One loss in finals = eliminated
     }
     

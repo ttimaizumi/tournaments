@@ -22,11 +22,7 @@ def fetch_matches(tournament_id):
 
 
 def is_playable(match):
-    """
-    A match is 'playable' for us if:
-      - It has both homeTeamId and visitorTeamId
-      - Its current score is 0–0 (or SKIP_IF_ALREADY_SCORED is False)
-    """
+
     score = match.get("score") or {}
     home_score = score.get("homeTeamScore", 0)
     visitor_score = score.get("visitorTeamScore", 0)
@@ -44,7 +40,7 @@ def is_playable(match):
 
 
 def generate_score(match):
-    return 1, 0
+    return 0, 1
 
 
 def update_match_score(tournament_id, match_id, home_score, visitor_score):
@@ -57,17 +53,17 @@ def update_match_score(tournament_id, match_id, home_score, visitor_score):
     }
     resp = requests.patch(url, json=payload, headers=HEADERS)
     if resp.status_code >= 400:
-        print(f"  ❌ Error updating: {resp.status_code} {resp.text}")
+        print(f"  Error updating: {resp.status_code} {resp.text}")
     else:
-        print(f"  ✓ Updated to {home_score}-{visitor_score}")
+        print(f"  Updated to {home_score}-{visitor_score}")
     resp.raise_for_status()
     return resp
 
 
 def main():
     # Change this if you want a hard-coded default
-    tournament_id = "3ffb6c0e-f09e-4bea-8432-4b254cd9a743"
-    print(f"Simulating tournament {tournament_id} (W, L, and F matches)...\n")
+    tournament_id = "b3c26fcf-e92d-4bd5-9e41-9a8e6405ad18"
+    print(f"Simulating tournament {tournament_id}")
 
 
     round_idx = 1
@@ -75,17 +71,17 @@ def main():
         matches = fetch_matches(tournament_id)
         playable = [m for m in matches if is_playable(m)]
         if not playable:
-            print("\nNo more playable unscored matches. Stopping.")
+            print("\nNo more playable unscored matches. Stopping simulation.")
             
             # Show matches waiting for teams
             waiting = [m for m in matches if not m.get("homeTeamId") or not m.get("visitorTeamId")]
             unscored_waiting = [m for m in waiting if m.get("score", {}).get("homeTeamScore", 0) == 0 and m.get("score", {}).get("visitorTeamScore", 0) == 0]
             if unscored_waiting:
-                print(f"\n⚠️  {len(unscored_waiting)} matches waiting for teams:")
+                print(f"\n{len(unscored_waiting)} matches waiting for teams:")
                 for m in sorted(unscored_waiting, key=lambda x: x.get("name", ""))[:10]:
                     name = m.get("name", "?")
-                    h = "✓" if m.get("homeTeamId") else "✗"
-                    v = "✓" if m.get("visitorTeamId") else "✗"
+                    h = "Set" if m.get("homeTeamId") else "TBD"
+                    v = "Set" if m.get("visitorTeamId") else "TBD"
                     print(f"  {name}: home={h}, visitor={v}")
             break
 
@@ -98,7 +94,8 @@ def main():
             return (order_map.get(prefix, 9), idx)
 
         playable.sort(key=sort_key)
-        print(f"\n=== ROUND {round_idx}: {len(playable)} playable matches ===")
+        print(f"\nROUND {round_idx}: {len(playable)} playable matches")
+        print("-" * 30)
         for m in playable:
             name = m.get("name", "?")
             match_id = m.get("id", "?")
@@ -107,25 +104,25 @@ def main():
             curr_v = score.get("visitorTeamScore", 0)
             home_id = m.get("homeTeamId", "?")[:8]
             visitor_id = m.get("visitorTeamId", "?")[:8]
-            print(f"Match {name:4} (ID: {match_id}) [H:{home_id} vs V:{visitor_id}] currently {curr_h}-{curr_v}", end="")
+            print(f"Match {name:4} (ID: {match_id}) [H:{home_id} vs V:{visitor_id}] current score {curr_h}-{curr_v}", end="")
             home_score, visitor_score = generate_score(m)
             update_match_score(tournament_id, m["id"], home_score, visitor_score)
             time.sleep(0.1)
         round_idx += 1
         
         if round_idx > MAX_ROUNDS:
-            print(f"\n⚠️  Hit MAX_ROUNDS safety limit ({MAX_ROUNDS}). Stopping.")
+            print(f"\nHit MAX_ROUNDS safety limit ({MAX_ROUNDS}). Stopping.")
             break
 
     print("\n" + "="*60)
-    print("TOURNAMENT SIMULATION COMPLETE")
+    print("TOURNAMENT COMPLETE")
     print("="*60)
     
     # Show final summary
     final_matches = fetch_matches(tournament_id)
     finals = [m for m in final_matches if m.get("name", "").startswith("F")]
     if finals:
-        print("\nFINAL MATCHES:")
+        print("\nFINAL MATCHES SUMMARY:")
         for m in finals:
             name = m["name"]
             score = m.get("score", {})
@@ -137,9 +134,9 @@ def main():
                 h_id = h_id[:8]
             if v_id != "TBD":
                 v_id = v_id[:8]
-            print(f"  {name}: [{h_id}] {h_score}-{v_score} [{v_id}]")
+            print(f"  {name}: [Home: {h_id}] {h_score}-{v_score} [Visitor: {v_id}]")
     
-    print("\nDone!")
+    print("\nSimulation finished.")
 
 
 if __name__ == "__main__":
