@@ -1,6 +1,5 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
-
 #include <memory>
 #include <string>
 #include <vector>
@@ -8,47 +7,47 @@
 #include "event/TeamAddEvent.hpp"
 #include "event/ScoreUpdateEvent.hpp"
 
-// IMPORTANT: include the *consumer* MatchDelegate
-#include "../../tournament_consumer/include/delegate/MatchDelegate.hpp"
+#include "../../tournament_consumer/include/delegate/MatchConsumerDelegate.hpp"
 
-// Domain
 #include "domain/Tournament.hpp"
 #include "domain/Group.hpp"
 #include "domain/Match.hpp"
 #include "domain/Team.hpp"
 
-// Mocks
 #include "mocks/MatchRepositoryMock.hpp"
 #include "mocks/GroupRepositoryMock.hpp"
 #include "mocks/TournamentRepositoryMock.h"
 
 using ::testing::NiceMock;
+using ::testing::_;
+using ::testing::Return;
+using ::testing::AtLeast;
 
-// Small helpers
+// ------------------------------
+// Helpers
+// ------------------------------
 namespace {
 
-std::shared_ptr<domain::Group> makeGroup(
-    const std::string& id,
-    const std::string& name,
-    const std::vector<std::string>& teamIds
+std::shared_ptr<domain::Group> mkGroup(
+    std::string id,
+    std::string name,
+    std::vector<std::string> teams
 ) {
     auto g = std::make_shared<domain::Group>(name, id);
-    for (const auto& tid : teamIds) {
-        domain::Team t;
-        t.Id   = tid;
-        t.Name = tid;
-        g->Teams().push_back(t);
+    for (auto& t : teams) {
+        domain::Team team;
+        team.Id = t;
+        team.Name = t;
+        g->Teams().push_back(team);
     }
     return g;
 }
 
 struct Fixture {
-    // Mocks live on stack
     NiceMock<MatchRepositoryMock>      matchRepoMock;
     NiceMock<GroupRepositoryMock>      groupRepoMock;
     NiceMock<TournamentRepositoryMock> tournamentRepoMock;
 
-    // Non-owning shared_ptr wrappers (no delete)
     std::shared_ptr<IMatchRepository> matchRepo{
         &matchRepoMock, [](IMatchRepository*){}
     };
@@ -59,92 +58,198 @@ struct Fixture {
         &tournamentRepoMock, [](TournamentRepository*){}
     };
 
-    MatchDelegate delegate{matchRepo, groupRepo, tournamentRepo};
+    MatchConsumerDelegate delegate{matchRepo, groupRepo, tournamentRepo};
 };
 
 } // namespace
 
-// ---------------------------------------------------------------------
-// ProcessTeamAddition: tournament not ready (minimal smoke test)
-// ---------------------------------------------------------------------
-TEST(MatchDelegateWorldCupTest,
-     ProcessTeamAddition_TournamentNotReady_DoesNotCrash) {
+// ============================================================================
+// 1) TEAM ADDITION -> TORNEO NO LISTO
+// ============================================================================
+TEST(MatchConsumerDelegateTest,
+     ProcessTeamAddition_TournamentNotReady_LogsAndDoesNotCreateMatches) {
     Fixture fx;
 
-    TeamAddEvent evt{};
-    evt.tournamentId = "TID-1";
-    evt.groupId      = "G1";
-    evt.teamId       = "TEAM-1";
+    TeamAddEvent evt{"TID-NOT-READY", "G1", "TEAM-1"};
 
-    // We only verify that the call does not throw or crash.
-    fx.delegate.ProcessTeamAddition(evt);
-}
-
-// ---------------------------------------------------------------------
-// ProcessTeamAddition: tournament "ready" scenario (smoke test)
-// ---------------------------------------------------------------------
-TEST(MatchDelegateWorldCupTest,
-     ProcessTeamAddition_TournamentReady_DoesNotCrash) {
-    Fixture fx;
-
-    TeamAddEvent evt{};
-    evt.tournamentId = "TID-2";
-    evt.groupId      = "G1";
-    evt.teamId       = "ANY-TEAM";
-
-    // Example setup (not strictly required by expectations)
-    auto tour = std::make_shared<domain::Tournament>(
+    auto tournament = std::make_shared<domain::Tournament>(
         "World Cup", domain::TournamentFormat{2, 3});
-    tour->Id() = "TID-2";
+    tournament->Id() = evt.tournamentId;
 
-    auto g1 = makeGroup("G1", "Group 1", {"A1", "A2", "A3"});
-    auto g2 = makeGroup("G2", "Group 2", {"B1", "B2", "B3"});
-    (void)tour;
-    (void)g1;
-    (void)g2;
+    auto g1 = mkGroup("G1", "Group 1", {"A1", "A2", "A3"});
+    auto g2 = mkGroup("G2", "Group 2", {"B1", "B2"}); // incompleto
+    std::vector<std::shared_ptr<domain::Group>> groups{g1, g2};
 
+    EXPECT_CALL(fx.tournamentRepoMock, ReadById(evt.tournamentId))
+        .Times(AtLeast(1))
+        .WillRepeatedly(Return(tournament));
+
+    EXPECT_CALL(fx.groupRepoMock,
+                FindByTournamentIdAndGroupId(evt.tournamentId, evt.groupId))
+        .Times(1)
+        .WillOnce(Return(g1));
+
+    EXPECT_CALL(fx.groupRepoMock,
+                FindByTournamentId(evt.tournamentId))
+        .Times(AtLeast(1))
+        .WillRepeatedly(Return(groups));
+
+    EXPECT_CALL(fx.matchRepoMock, Create(_))
+        .Times(0);
+
+    testing::internal::CaptureStdout();
     fx.delegate.ProcessTeamAddition(evt);
+    std::string out = testing::internal::GetCapturedStdout();
+
+    EXPECT_NE(out.find("[MatchDelegate/WC] Team added in tournament: "
+                       + evt.tournamentId),
+              std::string::npos);
+
+    EXPECT_NE(out.find("Tournament not ready yet; waiting for more teams"),
+              std::string::npos);
 }
 
-// ---------------------------------------------------------------------
-// ProcessScoreUpdate: there are pending group matches scenario (smoke test)
-// ---------------------------------------------------------------------
-TEST(MatchDelegateWorldCupTest,
-     ProcessScoreUpdate_PendingGroupMatches_DoesNotCrash) {
+// ============================================================================
+// 2) TEAM ADDITION -> TORNEO LISTO
+// ============================================================================
+TEST(MatchConsumerDelegateTest,
+     ProcessTeamAddition_TournamentReady_LogsAndTriggersCreation) {
     Fixture fx;
 
-    ScoreUpdateEvent evt{};
-    evt.tournamentId = "TID-3";
+    TeamAddEvent evt{"TID-READY", "G1", "X-Team"};
+
+    auto tournament = std::make_shared<domain::Tournament>(
+        "World Cup", domain::TournamentFormat{2, 3});
+    tournament->Id() = evt.tournamentId;
+
+    // ambos completos
+    auto g1 = mkGroup("G1", "Group 1", {"A1", "A2", "A3"});
+    auto g2 = mkGroup("G2", "Group 2", {"B1", "B2", "B3"});
+    std::vector<std::shared_ptr<domain::Group>> groups{g1, g2};
+
+    EXPECT_CALL(fx.tournamentRepoMock, ReadById(evt.tournamentId))
+        .Times(AtLeast(1))
+        .WillRepeatedly(Return(tournament));
+
+    EXPECT_CALL(fx.groupRepoMock,
+                FindByTournamentIdAndGroupId(evt.tournamentId, evt.groupId))
+        .Times(1)
+        .WillOnce(Return(g1));
+
+    EXPECT_CALL(fx.groupRepoMock,
+                FindByTournamentId(evt.tournamentId))
+        .Times(AtLeast(1))
+        .WillRepeatedly(Return(groups));
+
+    EXPECT_CALL(fx.matchRepoMock, Create(_))
+        .Times(AtLeast(1));
+
+    testing::internal::CaptureStdout();
+    fx.delegate.ProcessTeamAddition(evt);
+    std::string out = testing::internal::GetCapturedStdout();
+
+    EXPECT_NE(out.find("[MatchDelegate/WC] Team added in tournament: "
+                       + evt.tournamentId),
+              std::string::npos);
+
+    EXPECT_NE(out.find("All groups complete -> creating group-stage matches"),
+              std::string::npos);
+}
+
+// ============================================================================
+// 3) SCORE UPDATE -> SIGUEN PARTIDOS DE GRUPOS PENDIENTES
+// ============================================================================
+TEST(MatchConsumerDelegateTest,
+     ProcessScoreUpdate_PendingMatches_ShowsPendingAndStops) {
+    Fixture fx;
+
+    ScoreUpdateEvent evt{"TID-PENDING"};
 
     auto m = std::make_shared<domain::Match>();
-    m->TournamentId() = "TID-3";
-    m->Round()        = "group";
-    m->Home().Id()    = "H1";
-    m->Home().Name()  = "Home 1";
-    m->Visitor().Id() = "V1";
-    m->Visitor().Name() = "Visitor 1";
+    m->TournamentId() = evt.tournamentId;
+    m->Round()        = "group"; // sin score => pendiente
 
     std::vector<std::shared_ptr<domain::Match>> matches{m};
-    (void)matches;
 
+    EXPECT_CALL(fx.matchRepoMock, FindByTournamentId(evt.tournamentId))
+        .Times(1)
+        .WillOnce(Return(matches));
+
+    EXPECT_CALL(fx.tournamentRepoMock, ReadById(_)).Times(0);
+    EXPECT_CALL(fx.groupRepoMock, FindByTournamentId(_)).Times(0);
+
+    testing::internal::CaptureStdout();
     fx.delegate.ProcessScoreUpdate(evt);
+    std::string out = testing::internal::GetCapturedStdout();
+
+    EXPECT_NE(out.find("Score update for tournament: " + evt.tournamentId),
+              std::string::npos);
+
+    EXPECT_NE(out.find("Still pending group matches"),
+              std::string::npos);
 }
 
-// ---------------------------------------------------------------------
-// ProcessScoreUpdate: all group matches played scenario (smoke test)
-// ---------------------------------------------------------------------
-TEST(MatchDelegateWorldCupTest,
-     ProcessScoreUpdate_AllGroupMatchesPlayed_DoesNotCrash) {
+// ============================================================================
+// 4) SCORE UPDATE -> TODOS LOS PARTIDOS DE GRUPOS JUGADOS, PERO TORNEO NO EXISTE
+// ============================================================================
+TEST(MatchConsumerDelegateTest,
+     ProcessScoreUpdate_AllPlayed_TournamentMissing_ShowsError) {
     Fixture fx;
 
-    ScoreUpdateEvent evt{};
-    evt.tournamentId = "TID-4";
+    ScoreUpdateEvent evt{"TID-NOT-FOUND"};
 
-    std::vector<std::shared_ptr<domain::Match>> matches;
-    auto tour = std::make_shared<domain::Tournament>("Knockout Only");
-    tour->Id() = "TID-4";
-    (void)matches;
-    (void)tour;
+    std::vector<std::shared_ptr<domain::Match>> matches; // vacíos = jugados todos
 
+    EXPECT_CALL(fx.matchRepoMock, FindByTournamentId(evt.tournamentId))
+        .Times(AtLeast(1))
+        .WillRepeatedly(Return(matches));
+
+    EXPECT_CALL(fx.tournamentRepoMock, ReadById(evt.tournamentId))
+        .Times(1)
+        .WillOnce(Return(nullptr));
+
+    EXPECT_CALL(fx.groupRepoMock, FindByTournamentId(_)).Times(0);
+
+    testing::internal::CaptureStdout();
     fx.delegate.ProcessScoreUpdate(evt);
+    std::string out = testing::internal::GetCapturedStdout();
+
+    EXPECT_NE(out.find("Score update for tournament: " + evt.tournamentId),
+              std::string::npos);
+
+    EXPECT_NE(out.find("[WC] ERROR: tournament not found"),
+              std::string::npos);
+}
+
+
+
+// ============================================================================
+// 5) SCORE UPDATE -> SCORE UPDATE PERO NO ES FASE DE GRUPOS (NO BLOQUEA)
+// ============================================================================
+TEST(MatchConsumerDelegateTest,
+     ProcessScoreUpdate_NonGroupMatches_DoesNotBlock) {
+    Fixture fx;
+
+    ScoreUpdateEvent evt{"TID-NONGROUP"};
+
+    auto match = std::make_shared<domain::Match>();
+    match->TournamentId() = evt.tournamentId;
+    match->Round()        = "qf";
+    match->Home().Id()    = "X1";
+    match->Visitor().Id() = "X2";
+
+    std::vector<std::shared_ptr<domain::Match>> matches{match};
+
+    EXPECT_CALL(fx.matchRepoMock, FindByTournamentId(evt.tournamentId))
+        .Times(1)
+        .WillOnce(Return(matches));
+
+    testing::internal::CaptureStdout();
+    fx.delegate.ProcessScoreUpdate(evt);
+    std::string out = testing::internal::GetCapturedStdout();
+
+    EXPECT_NE(out.find("Score update for tournament: " + evt.tournamentId),
+              std::string::npos);
+
+    EXPECT_EQ(out.find("Still pending group matches"), std::string::npos);
 }

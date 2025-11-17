@@ -1,8 +1,37 @@
-/cmake-build-release/
-/cmake-build-debug/
-/vcpkg_installed/
-/.idea
-/.vscode/
-/Testing/
-/CMakePresets.json
-/out/
+# Build artifacts
+build/
+cmake-build-*/
+out/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# vcpkg
+vcpkg_installed/
+**/vcpkg_installed/
+
+# Binary files
+*.a
+*.so
+*.so.*
+*.dylib
+*.dll
+*.exe
+*.lib
+*.obj
+*.o
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Test results
+Testing/
+CTestTestfile.cmake
+
+# Logs
+*.log
