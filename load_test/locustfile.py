@@ -342,3 +342,4 @@ class TournamentUser(HttpUser):
         # Para que solo se ejecute una vez y Locust pare
         if self.environment.runner is not None:
             self.environment.runner.quit()
+#por que no cambia
