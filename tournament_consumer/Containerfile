@@ -1,0 +1,55 @@
+# Stage 1: Build stage
+FROM fedora:42 AS builder
+
+# Install build dependencies
+RUN dnf install -y ninja gcc vim gcc gcc-c++ clang openssh-server lldb clangd libicu python3 pip cmake perl gdb awk npm git bison flex autoconf openssl libtool automake kernel-devel
+RUN  dnf -y update
+
+RUN git clone --depth 1 https://github.com/microsoft/vcpkg.git /opt/vcpkg/
+RUN chmod 777 -R /opt/vcpkg
+
+RUN /opt/vcpkg/bootstrap-vcpkg.sh
+RUN export VCPKG_BINARY_SOURCES="clear;files,/opt/vcpkg/binary-cache,readwrite"
+
+RUN git clone --depth 1 https://github.com/carloszamora08/Proyecto-final-CPYD.git /root/tournaments
+
+# Set working directory for build
+WORKDIR /root/tournaments
+
+RUN cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM=ninja -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_TOOLCHAIN_FILE=/opt/vcpkg/scripts/buildsystems/vcpkg.cmake -G Ninja -S /root/tournaments -B /root/tournaments/cmake-build-release
+RUN cmake --build /root/tournaments/cmake-build-release --target tournament_consumer
+
+
+# Stage 2: Runtime stage
+FROM fedora-minimal:42
+
+# Set metadata
+LABEL maintainer="your-email@example.com"
+LABEL description="CMake application on Fedora"
+
+# Install only runtime dependencies (if needed)
+# Example: If your app needs specific libraries
+# RUN microdnf install -y libstdc++ && microdnf clean all
+
+# Create a non-root user for security
+RUN useradd -m -u 1001 appuser
+
+# Set working directory
+WORKDIR /app
+
+# Copy the built binary from builder stage
+# Adjust the path to match your CMake output
+COPY --from=builder /root/tournaments/cmake-build-release/tournament_consumer/tournament_consumer /app/
+COPY --from=builder /root/tournaments/cmake-build-release/tournament_consumer/configuration.json /app/
+
+# Copy any required runtime files (config files, assets, etc.)
+# COPY --from=builder /build/config /app/config/
+
+# Change ownership to non-root user
+RUN chown -R appuser:appuser /app
+
+# Switch to non-root user
+USER appuser
+
+# Start your application
+CMD ["./tournament_consumer"]
