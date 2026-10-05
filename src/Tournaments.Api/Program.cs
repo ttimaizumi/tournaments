@@ -16,6 +16,7 @@ builder.Services.AddScoped<IGroupRepository, GroupRepository>();
 builder.Services.AddSingleton<IMessagePublisher>(_ => new ActiveMqMessagePublisher(
     builder.Configuration["ActiveMq:BrokerUri"]
     ?? throw new InvalidOperationException("ActiveMq:BrokerUri is required.")));
+builder.Services.AddScoped<TeamDelegate>();
 builder.Services.AddScoped<TournamentService>();
 builder.Services.AddScoped<GroupService>();
 
@@ -23,25 +24,25 @@ var app = builder.Build();
 
 app.MapGet("/health", () => Results.Text("Services running"));
 
-app.MapGet("/teams", async (ITeamRepository teams, CancellationToken cancellationToken) =>
-    Results.Json(await teams.GetAllAsync(cancellationToken)));
+app.MapGet("/teams", async (TeamDelegate teams, CancellationToken cancellationToken) =>
+    Results.Json(await teams.GetAllTeamsAsync(cancellationToken)));
 
-app.MapGet("/teams/{teamId}", async (string teamId, ITeamRepository teams, CancellationToken cancellationToken) =>
+app.MapGet("/teams/{teamId}", async (string teamId, TeamDelegate teams, CancellationToken cancellationToken) =>
 {
     if (!System.Text.RegularExpressions.Regex.IsMatch(teamId, "^[A-Za-z0-9-]+$"))
     {
         return Results.Text("Invalid ID format", statusCode: StatusCodes.Status400BadRequest);
     }
 
-    var team = await teams.GetAsync(teamId, cancellationToken);
+    var team = await teams.GetTeamAsync(teamId, cancellationToken);
     return team is null
         ? Results.Text("team not found", statusCode: StatusCodes.Status404NotFound)
         : Results.Json(team);
 });
 
-app.MapPost("/teams", async (Team team, HttpContext context, ITeamRepository teams, CancellationToken cancellationToken) =>
+app.MapPost("/teams", async (Team team, HttpContext context, TeamDelegate teams, CancellationToken cancellationToken) =>
 {
-    var id = await teams.CreateAsync(team, cancellationToken);
+    var id = await teams.SaveTeamAsync(team, cancellationToken);
     context.Response.Headers.Location = id;
     return Results.StatusCode(StatusCodes.Status201Created);
 });
