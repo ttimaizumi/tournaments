@@ -2,6 +2,6 @@
   <ItemGroup>
     <ProjectReference Include="../Tournaments.Core/Tournaments.Core.csproj" />
     <ProjectReference Include="../Tournaments.Infrastructure/Tournaments.Infrastructure.csproj" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.12" />
   </ItemGroup>
 </Project>

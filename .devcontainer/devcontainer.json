@@ -1,6 +1,6 @@
 {
   "name": "Tournaments .NET",
-  "image": "mcr.microsoft.com/devcontainers/dotnet:1-8.0-bookworm",
+  "image": "mcr.microsoft.com/devcontainers/dotnet:1-10.0-bookworm",
   "forwardPorts": [8080],
   "customizations": {
     "vscode": {

@@ -1,6 +1,6 @@
 # Tournaments
 
-The project is a .NET 8 solution containing an ASP.NET Core API, PostgreSQL repositories, and an ActiveMQ background consumer.
+The project is a .NET 10 solution containing an ASP.NET Core API, PostgreSQL repositories, and an ActiveMQ background consumer.
 
 ## Projects
 
@@ -12,7 +12,7 @@ The project is a .NET 8 solution containing an ASP.NET Core API, PostgreSQL repo
 
 ## Local development
 
-Requires the .NET 8 SDK.
+Requires the .NET 10 SDK.
 
 ```bash
 dotnet restore
