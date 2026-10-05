@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+  <ItemGroup>
+    <ProjectReference Include="../Tournaments.Core/Tournaments.Core.csproj" />
+    <ProjectReference Include="../Tournaments.Infrastructure/Tournaments.Infrastructure.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
+  </ItemGroup>
+</Project>

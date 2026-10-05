@@ -1,25 +1,15 @@
 {
-  "name": "Dev Container",
-  "image": "dev_image",
-  "runArgs": [
-    "--replace",
-    "--network", "development",
-    "-p", "20202:22",
-    "-p", "8080:8080",
-    "-v", "/home/tomas/workspace/:/root/workspace:z"
-  ],
-  "remoteUser": "root",
-  "workspaceFolder": "/root/workspace",
-  "mounts": [
-    "source=/home/tomas/workspace,target=/root/workspace,type=bind,consistency=cached"
-  ],
+  "name": "Tournaments .NET",
+  "image": "mcr.microsoft.com/devcontainers/dotnet:1-8.0-bookworm",
+  "forwardPorts": [8080],
   "customizations": {
     "vscode": {
       "settings": {
         "terminal.integrated.defaultProfile.linux": "bash"
       },
       "extensions": [
-        "ms-vscode.cpptools",
+        "ms-dotnettools.csharp",
+        "ms-dotnettools.csdevkit",
         "ms-vscode-remote.remote-containers"
       ]
     }

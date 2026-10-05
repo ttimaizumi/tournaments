@@ -1,5 +1,0 @@
-{
-  "dependencies" : [ "crow", "hypodermic", "libpqxx", "gtest", "nlohmann-json", "activemq-cpp"],
-  "version" : "1.0.0",
-  "name" : "tournaments"
-}

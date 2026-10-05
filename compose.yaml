@@ -1,0 +1,46 @@
+services:
+  tournament_db:
+    image: postgres:17.6-alpine3.22
+    environment:
+      POSTGRES_PASSWORD: password
+    volumes:
+      - ./database/db_script.sql:/docker-entrypoint-initdb.d/01-tournaments.sql:ro,Z
+      - tournament-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tournament_svc -d tournament_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  artemis:
+    image: apache/activemq-classic:6.1.7
+    ports:
+      - "127.0.0.1:8161:8161"
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Containerfile.api
+    ports:
+      - "8080:8080"
+    depends_on:
+      tournament_db:
+        condition: service_healthy
+      artemis:
+        condition: service_started
+    restart: unless-stopped
+
+  consumer:
+    build:
+      context: .
+      dockerfile: Containerfile.consumer
+    depends_on:
+      tournament_db:
+        condition: service_healthy
+      artemis:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  tournament-data:

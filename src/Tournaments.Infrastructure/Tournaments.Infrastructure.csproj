@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../Tournaments.Core/Tournaments.Core.csproj" />
+    <PackageReference Include="Apache.NMS.ActiveMQ" Version="2.2.0" />
+    <PackageReference Include="Npgsql" Version="8.0.6" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,11 @@
+.git
+.cache
+.dotnet
+.idea
+.local
+.nuget
+.vs
+.vscode
+**/bin
+**/obj
+TestResults
