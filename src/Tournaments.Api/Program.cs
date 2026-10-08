@@ -17,8 +17,8 @@ builder.Services.AddSingleton<IMessagePublisher>(_ => new ActiveMqMessagePublish
     builder.Configuration["ActiveMq:BrokerUri"]
     ?? throw new InvalidOperationException("ActiveMq:BrokerUri is required.")));
 builder.Services.AddScoped<TeamDelegate>();
+builder.Services.AddScoped<GroupDelegate>();
 builder.Services.AddScoped<TournamentService>();
-builder.Services.AddScoped<GroupService>();
 
 var app = builder.Build();
 
@@ -63,16 +63,16 @@ app.MapPost("/tournaments", async (
 
 app.MapGet("/tournaments/{tournamentId}/groups", async (
     string tournamentId,
-    GroupService groups,
-    CancellationToken cancellationToken) => Results.Json(await groups.GetAllAsync(tournamentId, cancellationToken)));
+    GroupDelegate groups,
+    CancellationToken cancellationToken) => Results.Json(await groups.GetAllGroupsAsync(tournamentId, cancellationToken)));
 
 app.MapGet("/tournaments/{tournamentId}/groups/{groupId}", async (
     string tournamentId,
     string groupId,
-    GroupService groups,
+    GroupDelegate groups,
     CancellationToken cancellationToken) =>
 {
-    var group = await groups.GetAsync(tournamentId, groupId, cancellationToken);
+    var group = await groups.GetGroupAsync(tournamentId, groupId, cancellationToken);
     return group is null ? Results.NotFound() : Results.Json(group);
 });
 
@@ -80,10 +80,10 @@ app.MapPost("/tournaments/{tournamentId}/groups", async (
     string tournamentId,
     Group group,
     HttpContext context,
-    GroupService groups,
+    GroupDelegate groups,
     CancellationToken cancellationToken) =>
 {
-    var result = await groups.CreateAsync(tournamentId, group, cancellationToken);
+    var result = await groups.SaveGroupAsync(tournamentId, group, cancellationToken);
     if (!result.IsSuccess)
     {
         return Results.Text(result.Error, statusCode: StatusCodes.Status422UnprocessableEntity);
@@ -100,7 +100,7 @@ app.MapMethods("/tournaments/{tournamentId}/groups/{groupId}/teams", ["PATCH"], 
     string tournamentId,
     string groupId,
     List<Team> teams,
-    GroupService groups,
+    GroupDelegate groups,
     CancellationToken cancellationToken) =>
 {
     var result = await groups.AddTeamsAsync(tournamentId, groupId, teams, cancellationToken);
