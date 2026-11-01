@@ -10,3 +10,9 @@ TestResults/
 .nuget/
 *.user
 *.suo
+.env
+# Never commit age identities or plaintext credential exports.
+*.agekey
+keys.txt
+database/credentials.env
+database/.credentials.enc.*
