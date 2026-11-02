@@ -2,7 +2,7 @@
 
 This guide is for the existing **local kind** deployment. Run commands from the
 repository root against the same cluster/context as the application. Requires
-`kubectl`, Helm 3+, the .NET 10 SDK for the optional instrumentation changes,
+`kubectl`, Helm 3+, the .NET 10 SDK if running the API outside containers,
 and enough host capacity for Prometheus, Grafana, and their supporting Pods.
 Nothing in this file is installed automatically.
 
@@ -19,12 +19,13 @@ in the same shell session so the chart-version variable remains available.
 | Layer | Measurements | Requirement |
 | --- | --- | --- |
 | Kubernetes | API/DB CPU, memory, restarts, replica count | Monitoring stack |
-| API | Slow routes, throughput, HTTP errors, runtime and Npgsql metrics | Add instrumentation in section 3 |
+| API | Slow routes, throughput, HTTP errors, runtime and Npgsql metrics | Built-in instrumentation; configure scraping in section 3 |
 | PostgreSQL | Expensive normalized SQL, calls, average execution time | `pg_stat_statements` and exporter |
 | Code | Exact expensive methods, allocation stacks, request-to-query correlation | A profiler and/or distributed tracing, not Prometheus alone |
 
-The API currently exposes `/health`, **not `/metrics`**. Installing Grafana alone
-does not provide endpoint latency or SQL timing. Metrics Server, installed for
+The API exposes `/health` and **`/metrics`**, including HTTP request histograms,
+.NET runtime metrics, and Npgsql client/pool metrics. Installing Grafana alone
+does not configure scraping or PostgreSQL server statistics. Metrics Server, installed for
 the HPA, is also not a replacement for Prometheus historical metrics.
 
 ## 1. Install Prometheus and Grafana
@@ -110,56 +111,18 @@ a Prometheus data source. Open Prometheus at <http://localhost:9090> and check
 **Status → Target health** (or **Targets**, depending on the UI version).
 
 Start with the bundled Kubernetes compute dashboards, selecting namespace
-`tournaments` and workload `tournaments-api`. They work before API instrumentation.
+`tournaments` and workload `tournaments-api`. They work before configuring API scraping.
 
-## 3. Add API metrics (manual application changes)
+## 3. Scrape the API and database-client metrics
 
-This section describes changes to make; this guide does **not** modify the API.
-Add the following packages to `src/Tournaments.Api`:
+OpenTelemetry is configured in `src/Tournaments.Api/Program.cs`, with package
+versions pinned in the API project file. No additional application changes are
+needed. HTTP latency uses explicit histogram buckets suitable for the PromQL
+examples below. Npgsql 10 exports database operation durations, pool connection
+counts, and other driver metrics through the `Npgsql` meter. Its pool name is
+`tournament-db`, not a connection string, to keep connection details out of labels.
 
-```bash
-dotnet add src/Tournaments.Api package OpenTelemetry.Extensions.Hosting
-dotnet add src/Tournaments.Api package OpenTelemetry.Instrumentation.AspNetCore
-dotnet add src/Tournaments.Api package OpenTelemetry.Instrumentation.Runtime
-dotnet add src/Tournaments.Api package OpenTelemetry.Exporter.Prometheus.AspNetCore --prerelease
-```
-
-Choose mutually compatible versions and review the versions written to the
-project file before committing. The Prometheus exporter may still require a
-prerelease version; do not blindly upgrade existing OpenTelemetry dependencies.
-
-In `src/Tournaments.Api/Program.cs`, add these imports:
-
-```csharp
-using OpenTelemetry.Metrics;
-using OpenTelemetry.Resources;
-```
-
-Before `builder.Build()`, add:
-
-```csharp
-builder.Services.AddOpenTelemetry()
-    .ConfigureResource(resource => resource.AddService("tournaments-api"))
-    .WithMetrics(metrics => metrics
-        .AddAspNetCoreInstrumentation()
-        .AddRuntimeInstrumentation()
-        .AddMeter("Npgsql")
-        .AddView("http.server.request.duration",
-            new ExplicitBucketHistogramConfiguration
-            {
-                Boundaries = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10]
-            })
-        .AddPrometheusExporter());
-```
-
-After `var app = builder.Build();`, add:
-
-```csharp
-app.MapPrometheusScrapingEndpoint();
-```
-
-Npgsql's meter provides driver/pool metrics supported by the installed Npgsql
-version; it does not automatically expose individual SQL text. Rebuild and
+These are client-side metrics, not PostgreSQL server statistics. Rebuild and
 load the API image with README step 2, then restart the API Deployment and wait
 for rollout. Verify `http://localhost:8080/metrics` contains metrics, not a 404.
 Use the README port-forward alternative if the cluster has no host mapping.
@@ -168,15 +131,54 @@ Apply the [API ServiceMonitor](../kubernetes/monitoring/api-servicemonitor.yml)
 after the Prometheus Operator CRDs are installed:
 
 ```bash
-# The existing Service has a selector, but needs its own discovery label.
-kubectl -n tournaments label service tournaments-api app=tournaments-api --overwrite
+kubectl apply -f kubernetes/api.yml
 kubectl apply -f kubernetes/monitoring/api-servicemonitor.yml
 ```
 
 `port: http` refers to the **Service port name**, not the container port number.
 The ServiceMonitor scrapes individual ready API endpoints, not just a random
-Pod through NodePort. If maintaining this setup, add the discovery label to
-the Service's `metadata.labels` in `kubernetes/api.yml` as well.
+Pod through NodePort. The Service's `metadata.labels` in `kubernetes/api.yml`
+already includes the matching discovery label.
+
+### Optional: export REST and SQL traces to an OTLP backend
+
+ASP.NET Core request spans and Npgsql command spans are registered together,
+so database operations inherit the incoming request's trace context. Health and
+metrics requests are excluded from request tracing to reduce noise. The service
+name defaults to `tournaments-api` and can be overridden with `OTEL_SERVICE_NAME`.
+
+Trace export is enabled only when `OTEL_EXPORTER_OTLP_ENDPOINT` or
+`OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` is set. Deploy an OpenTelemetry Collector,
+Tempo, or another OTLP receiver first; Prometheus does not receive these traces.
+For example, if an existing collector is listening on gRPC port 4317:
+
+```bash
+kubectl -n tournaments set env deployment/tournaments-api \
+  OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector.monitoring.svc.cluster.local:4317 \
+  OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+kubectl -n tournaments rollout status deployment/tournaments-api --timeout=180s
+```
+
+The hostname is an example, not a collector installed by this repository. For
+HTTP/protobuf receivers use protocol `http/protobuf` and the corresponding
+endpoint (commonly port 4318). OTLP exports traces only here; Prometheus continues
+scraping metrics. Use `OTEL_TRACES_SAMPLER=parentbased_traceidratio` with
+`OTEL_TRACES_SAMPLER_ARG=0.1` to sample about 10% of new root traces, while
+respecting parent decisions. The default samples all traces.
+
+For persistent Kubernetes configuration, put these settings in the application
+ConfigMap or Deployment manifest. For local Bash or fish, the equivalent is:
+
+```bash
+env OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 \
+  OTEL_EXPORTER_OTLP_PROTOCOL=grpc dotnet run --project src/Tournaments.Api
+```
+
+Npgsql spans may contain SQL text and database/server metadata. Queries are
+parameterized and parameter logging is not enabled, but SQL literals can still
+contain sensitive information: restrict backend access and review telemetry
+before exporting it. Tracing does not install PostgreSQL extensions or replace
+the server-side analysis in sections 4–7.
 
 Keep `/metrics` private in any non-local environment. Do not use raw URLs,
 team names, UUIDs, passwords, or SQL text as metric labels: they can expose
@@ -456,8 +458,8 @@ or use Prometheus rates instead.
 5. Inspect the query plan. Change one thing (pagination, query shape, index,
    pool sizing) and rerun the same workload and measurement window.
 6. If API CPU remains high but SQL is cheap, use `dotnet-trace`/`dotnet-counters`
-   or a profiler. For exact request-to-query correlation, add OpenTelemetry
-   tracing and a backend such as Tempo; Prometheus metrics alone cannot provide
+   or a profiler. For exact request-to-query correlation, configure OTLP trace
+   export and a backend such as Tempo; Prometheus metrics alone cannot provide
    stack traces or establish which individual request executed a query.
 
 ## Troubleshooting

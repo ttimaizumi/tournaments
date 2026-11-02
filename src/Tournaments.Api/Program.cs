@@ -1,15 +1,50 @@
 using Npgsql;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using Tournaments.Core;
 using Tournaments.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource.AddService(
+        builder.Configuration["OTEL_SERVICE_NAME"] ?? "tournaments-api"))
+    .WithMetrics(metrics => metrics
+        .AddAspNetCoreInstrumentation()
+        .AddRuntimeInstrumentation()
+        .AddMeter("Npgsql")
+        .AddView("http.server.request.duration", new ExplicitBucketHistogramConfiguration
+        {
+            Boundaries = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10]
+        })
+        .AddPrometheusExporter())
+    .WithTracing(tracing =>
+    {
+        tracing.AddAspNetCoreInstrumentation(options =>
+            options.Filter = context =>
+                !context.Request.Path.StartsWithSegments("/metrics") &&
+                !context.Request.Path.StartsWithSegments("/health"))
+            .AddNpgsql();
+
+        // Do not send traces to an implicit localhost collector when none is configured.
+        if (!string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]) ||
+            !string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"]))
+        {
+            tracing.AddOtlpExporter();
+        }
+    });
+
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull);
 
-builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(
+builder.Services.AddSingleton(_ => new NpgsqlDataSourceBuilder(
     builder.Configuration.GetConnectionString("Tournaments")
-    ?? throw new InvalidOperationException("ConnectionStrings:Tournaments is required.")));
+    ?? throw new InvalidOperationException("ConnectionStrings:Tournaments is required."))
+{
+    // Keep connection details out of pool-name metric labels.
+    Name = "tournament-db"
+}.Build());
 builder.Services.AddScoped<ITeamRepository, TeamRepository>();
 builder.Services.AddScoped<ITournamentRepository, TournamentRepository>();
 builder.Services.AddScoped<IGroupRepository, GroupRepository>();
@@ -21,6 +56,8 @@ builder.Services.AddScoped<GroupDelegate>();
 builder.Services.AddScoped<TournamentService>();
 
 var app = builder.Build();
+
+app.MapPrometheusScrapingEndpoint();
 
 app.MapGet("/health", () => Results.Text("Services running"));
 

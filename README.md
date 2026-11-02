@@ -30,6 +30,11 @@ dotnet run --project src/Tournaments.Api
 
 ## Containers
 
+The API exposes OpenTelemetry HTTP/runtime and Npgsql database-client metrics
+at `/metrics`. It also instruments REST requests and SQL operations for tracing;
+set an OTLP endpoint to export traces. See [the monitoring guide](docs/monitoring.md)
+for Prometheus discovery, Grafana, trace configuration, and server-side SQL analysis.
+
 To run only PostgreSQL in a local kind Kubernetes cluster, follow
 [the database setup guide](database/README.md).
 

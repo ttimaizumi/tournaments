@@ -40,6 +40,8 @@ kind: Service
 metadata:
   name: tournaments-api
   namespace: tournaments
+  labels:
+    app: tournaments-api
 spec:
   type: NodePort
   selector:
