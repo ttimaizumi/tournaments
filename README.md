@@ -28,11 +28,18 @@ ActiveMq__BrokerUri='activemq:tcp://localhost:61616' \
 dotnet run --project src/Tournaments.Api
 ```
 
+## Load testing
+
+Use [the Locust load-test guide](load_test/README.md) to exercise team,
+tournament, and group creation, reads, and team assignment. Match progression
+and tournament-winner APIs are not implemented and are not simulated.
+
 ## Containers
 
 The API exposes OpenTelemetry HTTP/runtime and Npgsql database-client metrics
 at `/metrics`. It also instruments REST requests and SQL operations for tracing;
-set an OTLP endpoint to export traces. See [the monitoring guide](docs/monitoring.md)
+the Kubernetes Deployment exports traces to Tempo in the `monitoring` namespace.
+See [the monitoring guide](docs/monitoring.md)
 for Prometheus discovery, Grafana, trace configuration, and server-side SQL analysis.
 
 To run only PostgreSQL in a local kind Kubernetes cluster, follow
@@ -140,6 +147,11 @@ configuration (credentials are intentionally hard-coded, as in Compose):
 - [API](kubernetes/api.yml): API Deployment and Service.
 - [API autoscaler](kubernetes/api-hpa.yml): 1–3 API Pods targeting 40% CPU utilization.
 - [Consumer](kubernetes/consumer.yml): background consumer Deployment.
+
+For REST/SQL traces in Grafana, deploy Tempo and its datasource using
+[monitoring guide section 3](docs/monitoring.md#export-rest-and-sql-traces-to-tempo).
+The API Deployment already points to that backend; without Tempo, trace exports
+fail, but the application and Prometheus metrics can still run.
 
 ```bash
 kubectl apply -f kubernetes/app-config.yml

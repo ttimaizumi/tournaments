@@ -140,34 +140,86 @@ The ServiceMonitor scrapes individual ready API endpoints, not just a random
 Pod through NodePort. The Service's `metadata.labels` in `kubernetes/api.yml`
 already includes the matching discovery label.
 
-### Optional: export REST and SQL traces to an OTLP backend
+### Export REST and SQL traces to Tempo
 
 ASP.NET Core request spans and Npgsql command spans are registered together,
 so database operations inherit the incoming request's trace context. Health and
 metrics requests are excluded from request tracing to reduce noise. The service
 name defaults to `tournaments-api` and can be overridden with `OTEL_SERVICE_NAME`.
 
-Trace export is enabled only when `OTEL_EXPORTER_OTLP_ENDPOINT` or
-`OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` is set. Deploy an OpenTelemetry Collector,
-Tempo, or another OTLP receiver first; Prometheus does not receive these traces.
-For example, if an existing collector is listening on gRPC port 4317:
+Prometheus stores metrics, **not traces**. The repository includes a local,
+single-instance Tempo deployment and Grafana datasource configuration:
+
+- [tempo.yml](../kubernetes/monitoring/tempo.yml): configuration, 5 GiB PVC,
+  Deployment, and internal Service. Uses the pinned Tempo 2.x single-binary
+  layout; a Tempo 3.x upgrade requires reviewing its migration requirements.
+- [tempo-datasource.yml](../kubernetes/monitoring/tempo-datasource.yml): a
+  datasource ConfigMap discovered by the Grafana sidecar installed by the chart.
+
+After installing the monitoring stack in section 1, run (Bash or fish):
+
+```bash
+kubectl apply -f kubernetes/monitoring/tempo.yml
+kubectl -n monitoring rollout status deployment/tempo --timeout=180s
+kubectl apply -f kubernetes/monitoring/tempo-datasource.yml
+kubectl apply -f kubernetes/api.yml
+kubectl -n tournaments rollout status deployment/tournaments-api --timeout=180s
+```
+
+The API Deployment sets `OTEL_EXPORTER_OTLP_ENDPOINT` to
+`http://tempo.monitoring.svc.cluster.local:4317` and the protocol to `grpc`.
+This enables its OTLP trace exporter; no additional Collector is required.
+If updating a live API without reapplying its image/replica configuration, use:
 
 ```bash
 kubectl -n tournaments set env deployment/tournaments-api \
-  OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector.monitoring.svc.cluster.local:4317 \
+  OTEL_EXPORTER_OTLP_ENDPOINT=http://tempo.monitoring.svc.cluster.local:4317 \
   OTEL_EXPORTER_OTLP_PROTOCOL=grpc
 kubectl -n tournaments rollout status deployment/tournaments-api --timeout=180s
 ```
 
-The hostname is an example, not a collector installed by this repository. For
-HTTP/protobuf receivers use protocol `http/protobuf` and the corresponding
-endpoint (commonly port 4318). OTLP exports traces only here; Prometheus continues
-scraping metrics. Use `OTEL_TRACES_SAMPLER=parentbased_traceidratio` with
+Grafana must query **port 3200** (`http://tempo.monitoring.svc.cluster.local:3200`),
+not OTLP ingestion ports 4317/4318. Do not put `localhost` in Grafana's datasource
+URL: that would refer to Grafana's own Pod. The datasource ConfigMap has
+`grafana_datasource: "1"`; the sidecar detects it and reloads provisioning without
+restarting Grafana. It preserves the existing Prometheus datasource.
+
+Open Grafana → **Connections → Data sources → Tempo**, then **Save & test**
+(or the datasource health action). It should report that the datasource works.
+In **Explore**, select **Tempo**, select TraceQL query mode, set the time range
+to the last 15 minutes, and run:
+
+```traceql
+{ resource.service.name = "tournaments-api" }
+```
+
+Call `/teams` or run the Locust scenario to generate traffic. Allow several
+seconds for the batch exporter. Open a trace to inspect the REST request and
+its nested Npgsql/database spans. `/health` and `/metrics` do not generate
+request traces. Spans generated before Tempo/exporting was enabled are not
+available retroactively.
+
+Tempo is internal-only, with no authentication or public NodePort. Its PVC
+retains traces across Pod replacements, with 48-hour retention; deleting the
+PVC or kind cluster loses that data. Retention is not a disk-size limit: high
+load can fill the 5 GiB volume. This single-instance/local-storage setup is not
+production HA. After changing `tempo-config`, reapply the file and run
+`kubectl -n monitoring rollout restart deployment/tempo` to reload it.
+
+For another OTLP receiver, override the API environment settings. HTTP/protobuf
+uses protocol `http/protobuf` and commonly port 4318. OTLP exports traces only
+here; Prometheus continues scraping metrics.
+Use `OTEL_TRACES_SAMPLER=parentbased_traceidratio` with
 `OTEL_TRACES_SAMPLER_ARG=0.1` to sample about 10% of new root traces, while
 respecting parent decisions. The default samples all traces.
 
-For persistent Kubernetes configuration, put these settings in the application
-ConfigMap or Deployment manifest. For local Bash or fish, the equivalent is:
+For local API development, first leave this running in another terminal:
+
+```bash
+kubectl -n monitoring port-forward service/tempo 4317:4317
+```
+
+Then, in Bash or fish:
 
 ```bash
 env OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 \
@@ -468,6 +520,15 @@ or use Prometheus rates instead.
   the `release: monitoring` label, and the Operator namespace selectors.
 - **API target down/404:** deploy the instrumented image, verify `/metrics`, and
   confirm the Service's named `http` port. `/health` succeeding is not enough.
+- **Trace datasource missing:** apply `tempo-datasource.yml` and inspect
+  `kubectl -n monitoring logs deployment/monitoring-grafana -c grafana-sc-datasources`.
+  The provisioned datasource is named `Tempo`, with UID `tempo`.
+- **Trace datasource connection error:** verify Tempo readiness and the internal
+  HTTP URL on port 3200. Inspect `kubectl -n monitoring logs deployment/tempo`.
+- **Tempo connected, no traces:** verify API OTLP environment settings, rebuild
+  the instrumented image if needed, and generate non-health API requests. Check
+  the Grafana time range and sampling settings. Service graphs/TraceQL metrics
+  require additional metrics-generator configuration, not enabled by this setup.
 - **PostgreSQL metrics absent:** inspect
   `kubectl -n tournaments logs deployment/postgres-exporter`; confirm `pg_up`,
   credentials, extension installation, and `SHOW shared_preload_libraries`.
