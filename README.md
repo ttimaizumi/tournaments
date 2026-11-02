@@ -51,9 +51,16 @@ you do not need the .NET SDK installed on the host to build these images.
 
 ### 1. Create the cluster and prepare PostgreSQL
 
+For hostname-based routing through a shared Traefik Ingress controller, follow
+[the optional Traefik setup](docs/ingress.md) instead of the direct API exposure
+configuration below. It includes separate kind/Helm/Ingress YAML files and
+Bash/fish commands; the application build and deployment steps remain the same.
+
 For a new cluster, use [kind.yml](kind.yml) to map host port 8080 to the API's
-NodePort (30080). Ensure host port 8080 is free, including any running Compose
-API container.
+NodePort (30080). It also reserves localhost ports 3000 and 9090 for Grafana and
+Prometheus when installed using [the monitoring guide](docs/monitoring.md).
+Ensure all three host ports are free, including any running Compose API
+container or dashboard port-forwards.
 
 ```bash
 # Choose an unused name if you already have a cluster named kind.
