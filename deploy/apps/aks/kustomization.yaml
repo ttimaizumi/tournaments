@@ -1,0 +1,23 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: tournaments
+resources:
+  - ../base
+images:
+  - name: tournament-services
+    newName: __ACR_LOGIN_SERVER__/tournament-services
+  - name: tournament-consumer
+    newName: __ACR_LOGIN_SERVER__/tournament-consumer
+replicas:
+  # Failover: raise these (commit to Git) after promoting the database replica
+  - name: tournament-services
+    count: 1
+  - name: tournament-consumer
+    count: 0
+patches:
+  - target:
+      kind: Deployment
+    patch: |-
+      - op: add
+        path: /spec/template/metadata/labels/azure.workload.identity~1use
+        value: "true"

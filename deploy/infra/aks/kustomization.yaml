@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: tournaments
+resources:
+  - ../base
+  - secret-provider-classes.yaml
+patches:
+  - target:
+      kind: ServiceAccount
+      name: tournaments
+    patch: |-
+      apiVersion: v1
+      kind: ServiceAccount
+      metadata:
+        name: tournaments
+        annotations:
+          azure.workload.identity/client-id: __AKS_IDENTITY_CLIENT_ID__

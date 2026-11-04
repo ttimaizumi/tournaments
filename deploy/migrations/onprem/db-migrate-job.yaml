@@ -1,0 +1,34 @@
+# Flux recreates the Job when its image tag changes; Flyway skips migrations already applied
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: tournament-db-migrate
+  annotations:
+    kustomize.toolkit.fluxcd.io/force: enabled
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      restartPolicy: Never
+      serviceAccountName: tournaments
+      containers:
+        - name: flyway
+          image: tournament-migrations
+          args: ["migrate"]
+          env:
+            # url, user (tournament_admin) and password come from Key Vault
+            - name: FLYWAY_CONFIG_FILES
+              value: /flyway/secrets/flyway.conf
+          volumeMounts:
+            - name: flyway-secrets
+              mountPath: /flyway/secrets
+              readOnly: true
+      volumes:
+        - name: flyway-secrets
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: tournament-db-migrations
+            nodePublishSecretRef:
+              name: secrets-store-creds

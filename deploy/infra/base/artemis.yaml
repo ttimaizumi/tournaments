@@ -1,0 +1,67 @@
+# Broker the apps reach at tcp://artemis:61616 (see configuration.json)
+apiVersion: v1
+kind: Service
+metadata:
+  name: artemis
+  labels:
+    app: artemis
+spec:
+  selector:
+    app: artemis
+  ports:
+    - name: core
+      port: 61616
+      targetPort: 61616
+    - name: console
+      port: 8161
+      targetPort: 8161
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: artemis
+spec:
+  serviceName: artemis
+  replicas: 1
+  selector:
+    matchLabels:
+      app: artemis
+  template:
+    metadata:
+      labels:
+        app: artemis
+    spec:
+      containers:
+        - name: artemis
+          image: apache/activemq-artemis:2.38.0
+          env:
+            # The apps connect without credentials today
+            - name: ANONYMOUS_LOGIN
+              value: "true"
+          ports:
+            - name: core
+              containerPort: 61616
+            - name: console
+              containerPort: 8161
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/artemis-instance/data
+          readinessProbe:
+            tcpSocket:
+              port: 61616
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              memory: 1Gi
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 5Gi

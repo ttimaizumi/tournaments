@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: tournaments
+resources:
+  - db-migrate-job.yaml
+images:
+  # newTag is set by Jenkins to the commit being released
+  - name: tournament-migrations
+    newName: __ONPREM_REGISTRY__/tournament-migrations
+    newTag: latest

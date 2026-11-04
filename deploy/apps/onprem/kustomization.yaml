@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: tournaments
+resources:
+  - ../base
+images:
+  - name: tournament-services
+    newName: __ONPREM_REGISTRY__/tournament-services
+  - name: tournament-consumer
+    newName: __ONPREM_REGISTRY__/tournament-consumer
+patches:
+  # Arc Key Vault extension authenticates with a service principal secret
+  - target:
+      kind: Deployment
+    patch: |-
+      - op: add
+        path: /spec/template/spec/volumes/0/csi/nodePublishSecretRef
+        value:
+          name: secrets-store-creds

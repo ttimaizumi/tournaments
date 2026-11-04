@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tournament-consumer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tournament-consumer
+  template:
+    metadata:
+      labels:
+        app: tournament-consumer
+    spec:
+      serviceAccountName: tournaments
+      containers:
+        - name: tournament-consumer
+          image: tournament-consumer
+          # configuration.json is read from the working directory
+          command: ["/app/tournament_consumer"]
+          workingDir: /config
+          volumeMounts:
+            - name: config
+              mountPath: /config
+              readOnly: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 100m
+              memory: 256Mi
+      volumes:
+        - name: config
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: tournament-consumer-config

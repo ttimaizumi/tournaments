@@ -1,0 +1,153 @@
+# kubectl apply -f tournament-db.yml
+# kubectl port-forward svc/tournament-db 5432:5432
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: tournament-db-credentials
+type: Opaque
+stringData:
+  POSTGRES_PASSWORD: password
+---
+# Copy of db_script.sql, executed by the postgres entrypoint on first start (empty volume only)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tournament-db-init
+data:
+  db_script.sql: |
+    CREATE USER tournament_svc WITH PASSWORD 'password';
+    CREATE USER tournament_admin WITH PASSWORD 'password';
+
+    CREATE DATABASE tournament_db;
+
+    \connect tournament_db
+
+    grant all privileges on database tournament_db to tournament_admin;
+    grant all privileges on database tournament_db to tournament_svc;
+    grant usage on schema public to tournament_admin;
+    grant usage on schema public to tournament_svc;
+
+    GRANT SELECT ON ALL TABLES IN SCHEMA public TO tournament_admin;
+    GRANT DELETE ON ALL TABLES IN SCHEMA public TO tournament_admin;
+    GRANT UPDATE ON ALL TABLES IN SCHEMA public TO tournament_admin;
+    GRANT INSERT ON ALL TABLES IN SCHEMA public TO tournament_admin;
+    GRANT CREATE ON SCHEMA public TO tournament_admin;
+
+    \connect tournament_db tournament_admin
+
+    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+    CREATE TABLE TEAMS (
+        id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+        document JSONB NOT NULL,
+        last_update_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE UNIQUE INDEX team_unique_name_idx ON teams ((document->>'name'));
+
+    CREATE TABLE TOURNAMENTS (
+        id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+        document JSONB NOT NULL,
+        last_update_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE UNIQUE INDEX tournament_unique_name_idx ON TOURNAMENTS ((document->>'name'));
+
+    CREATE TABLE GROUPS (
+        id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+        TOURNAMENT_ID UUID not null references TOURNAMENTS(ID),
+        document JSONB NOT NULL,
+        last_update_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE UNIQUE INDEX tournament_group_unique_name_idx ON GROUPS (tournament_id,(document->>'name'));
+
+    CREATE TABLE MATCHES (
+        id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+        document JSONB NOT NULL,
+        last_update_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    GRANT SELECT ON ALL TABLES IN SCHEMA public TO tournament_svc;
+    GRANT DELETE ON ALL TABLES IN SCHEMA public TO tournament_svc;
+    GRANT UPDATE ON ALL TABLES IN SCHEMA public TO tournament_svc;
+    GRANT INSERT ON ALL TABLES IN SCHEMA public TO tournament_svc;
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tournament-db
+  labels:
+    app: tournament-db
+spec:
+  selector:
+    app: tournament-db
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: tournament-db
+spec:
+  serviceName: tournament-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tournament-db
+  template:
+    metadata:
+      labels:
+        app: tournament-db
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:17.6-alpine3.22
+          ports:
+            - name: postgres
+              containerPort: 5432
+          envFrom:
+            - secretRef:
+                name: tournament-db-credentials
+          env:
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: init
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres", "-d", "tournament_db"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 512Mi
+      volumes:
+        - name: init
+          configMap:
+            name: tournament-db-init
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: standard
+        resources:
+          requests:
+            storage: 1Gi
