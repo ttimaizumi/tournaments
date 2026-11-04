@@ -31,8 +31,8 @@ dotnet run --project src/Tournaments.Api
 ## Load testing
 
 Use [the Locust load-test guide](load_test/README.md) to exercise team,
-tournament, and group creation, reads, and team assignment. Match progression
-and tournament-winner APIs are not implemented and are not simulated.
+tournament, and group creation, reads, and team assignment. The match, score,
+and standings APIs are not exercised by the load test.
 
 ## Containers
 
