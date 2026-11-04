@@ -174,9 +174,10 @@ across Pod replacements; it is not a production deployment.
 
 The API starts with 1 replica. Its Horizontal Pod Autoscaler (HPA) maintains
 between 1 and 3 replicas, targeting **40% of each Pod's requested CPU**, averaged
-across API Pods. With a `250m` CPU request, the target is approximately `100m`
-(0.1 CPU core) per Pod, not 40% of the host's CPU. Requests are scheduling
-reservations, not CPU limits. The Service routes traffic to ready API Pods.
+across API Pods. With a `100m` CPU request, the target is approximately `40m`
+(0.04 CPU core) per Pod, not 40% of the host's CPU. The API and consumer Pods
+are also limited to `100m`, so a busy Pod is throttled rather than using more
+CPU; the HPA adds Pods well before that point. The Service routes traffic to ready API Pods.
 This scales Pods only; the kind node count remains fixed and must have enough
 capacity for additional replicas.
 

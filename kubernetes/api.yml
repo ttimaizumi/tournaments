@@ -19,7 +19,9 @@ spec:
           imagePullPolicy: Never
           resources:
             requests:
-              cpu: 250m
+              cpu: 100m
+            limits:
+              cpu: 100m
           ports:
             - containerPort: 8080
           envFrom:

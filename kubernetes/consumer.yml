@@ -17,6 +17,11 @@ spec:
         - name: consumer
           image: localhost/tournaments-consumer:dev
           imagePullPolicy: Never
+          resources:
+            requests:
+              cpu: 100m
+            limits:
+              cpu: 100m
           envFrom:
             - configMapRef:
                 name: tournaments-app-config

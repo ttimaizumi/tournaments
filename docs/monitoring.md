@@ -361,8 +361,9 @@ sum by (pod) (
 ```
 
 Repeat these panels with `container="postgres"` and `pod="tournament-db-0"`
-for database resource usage. The API HPA targets 40% of its `250m` CPU request,
-approximately `0.1` CPU core per Pod, not 40% of the node.
+for database resource usage. The API HPA targets 40% of its `100m` CPU request,
+approximately `0.04` CPU core per Pod, not 40% of the node. API and consumer Pods
+are limited to `100m`; usage flat at that line means the Pod is being throttled.
 
 ### Requests per second, by route (requires section 3)
 
