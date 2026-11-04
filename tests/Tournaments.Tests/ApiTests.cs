@@ -85,6 +85,43 @@ public sealed class ApiTests : IClassFixture<TournamentApiFactory>
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         Assert.True(Guid.TryParse(response.Headers.Location?.OriginalString, out _));
     }
+
+    [Fact]
+    public async Task Create_tournament_rejects_format_other_than_one_group_of_32()
+    {
+        using var client = factory.CreateClient();
+        var response = await client.PostAsJsonAsync("/tournaments", new Tournament
+        {
+            Name = "Two groups",
+            Format = new TournamentFormat { NumberOfGroups = 2, MaxTeamsPerGroup = 16 }
+        });
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Update_score_records_result_and_returns_404_for_unknown_match()
+    {
+        var matches = (FakeMatchRepository)factory.Services.GetRequiredService<IMatchRepository>();
+        var tournamentId = Guid.NewGuid().ToString();
+        var match = new Match
+        {
+            Id = Guid.NewGuid().ToString(), TournamentId = tournamentId, Stage = MatchStage.ROUND_ROBIN,
+            Round = 1, MatchNumber = 1, HomeTeamId = "home", VisitorTeamId = "visitor"
+        };
+        matches.Matches.Add(match);
+        using var client = factory.CreateClient();
+        var score = new { homeTeamScore = 2, visitorTeamScore = 1 };
+
+        var updated = await client.PutAsJsonAsync($"/tournaments/{tournamentId}/matches/{match.Id}/score", score);
+        var missing = await client.PutAsJsonAsync($"/tournaments/{tournamentId}/matches/{Guid.NewGuid()}/score", score);
+        var fetched = await client.GetFromJsonAsync<Match>($"/tournaments/{tournamentId}/matches/{match.Id}");
+
+        Assert.Equal(HttpStatusCode.NoContent, updated.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+        Assert.Equal(2, fetched?.Score?.HomeTeamScore);
+        Assert.Equal(1, fetched?.Score?.VisitorTeamScore);
+    }
 }
 
 public sealed class TournamentApiFactory : WebApplicationFactory<Program>
@@ -98,10 +135,12 @@ public sealed class TournamentApiFactory : WebApplicationFactory<Program>
             services.RemoveAll<ITeamRepository>();
             services.RemoveAll<ITournamentRepository>();
             services.RemoveAll<IGroupRepository>();
+            services.RemoveAll<IMatchRepository>();
             services.RemoveAll<IMessagePublisher>();
             services.AddSingleton<ITeamRepository, FakeTeamRepository>();
             services.AddSingleton<ITournamentRepository, FakeTournamentRepository>();
             services.AddSingleton<IGroupRepository, FakeGroupRepository>();
+            services.AddSingleton<IMatchRepository, FakeMatchRepository>();
             services.AddSingleton<IMessagePublisher, FakeMessagePublisher>();
         });
     }

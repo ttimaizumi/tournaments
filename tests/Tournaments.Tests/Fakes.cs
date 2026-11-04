@@ -59,10 +59,66 @@ internal sealed class FakeGroupRepository : IGroupRepository
         return Task.FromResult(group.Id);
     }
 
-    public Task AddTeamAsync(string groupId, Team team, CancellationToken cancellationToken = default)
+    public Task<bool> AddTeamsAsync(
+        string groupId,
+        IReadOnlyList<Team> teams,
+        int maxTeams,
+        CancellationToken cancellationToken = default)
     {
-        Groups.Single(group => group.Id == groupId).Teams.Add(team);
-        return Task.CompletedTask;
+        var group = Groups.Single(group => group.Id == groupId);
+        if (group.Teams.Count + teams.Count > maxTeams || group.Teams.Any(existing => teams.Any(t => t.Id == existing.Id)))
+        {
+            return Task.FromResult(false);
+        }
+
+        group.Teams.AddRange(teams);
+        return Task.FromResult(true);
+    }
+}
+
+internal sealed class FakeMatchRepository : IMatchRepository
+{
+    public List<Match> Matches { get; } = [];
+
+    public Task<Match?> GetAsync(string tournamentId, string matchId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Matches.SingleOrDefault(match => match.TournamentId == tournamentId && match.Id == matchId));
+
+    public Task<IReadOnlyList<Match>> GetAllAsync(string tournamentId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Match>>(Matches.Where(match => match.TournamentId == tournamentId).ToList());
+
+    public Task<int> CreateManyAsync(IReadOnlyList<Match> matches, CancellationToken cancellationToken = default)
+    {
+        var inserted = 0;
+        foreach (var match in matches)
+        {
+            if (Matches.Any(existing => existing.TournamentId == match.TournamentId && existing.Stage == match.Stage &&
+                                        existing.Round == match.Round && existing.MatchNumber == match.MatchNumber))
+            {
+                continue;
+            }
+
+            match.Id ??= Guid.NewGuid().ToString();
+            Matches.Add(match);
+            inserted++;
+        }
+
+        return Task.FromResult(inserted);
+    }
+
+    public Task<bool> UpdateScoreAsync(
+        string tournamentId,
+        string matchId,
+        Score score,
+        CancellationToken cancellationToken = default)
+    {
+        var match = Matches.SingleOrDefault(match => match.TournamentId == tournamentId && match.Id == matchId);
+        if (match is null)
+        {
+            return Task.FromResult(false);
+        }
+
+        match.Score = score;
+        return Task.FromResult(true);
     }
 }
 

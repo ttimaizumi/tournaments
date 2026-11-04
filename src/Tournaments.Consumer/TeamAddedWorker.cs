@@ -7,7 +7,7 @@ namespace Tournaments.Consumer;
 
 public sealed class TeamAddedWorker(
     IConfiguration configuration,
-    IGroupRepository groups,
+    MatchDelegate matches,
     ILogger<TeamAddedWorker> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -18,7 +18,7 @@ public sealed class TeamAddedWorker(
         using var connection = factory.CreateConnection();
         connection.Start();
         using var session = connection.CreateSession(AcknowledgementMode.AutoAcknowledge);
-        using var consumer = session.CreateConsumer(session.GetQueue("tournament.team-add"));
+        using var consumer = session.CreateConsumer(session.GetQueue(GroupDelegate.TeamAddQueue));
 
         logger.LogInformation("Listening on tournament.team-add");
         while (!stoppingToken.IsCancellationRequested)
@@ -37,15 +37,27 @@ public sealed class TeamAddedWorker(
                     continue;
                 }
 
-                var group = await groups.GetAsync(teamAdded.TournamentId, teamAdded.GroupId, stoppingToken);
-                if (group?.Teams.Count == 32)
+                // Every team-add message re-checks the group; generation is a no-op until it is full
+                // and idempotent afterwards, so redelivered or concurrent messages are harmless.
+                var result = await matches.GenerateRoundRobinAsync(teamAdded.TournamentId, teamAdded.GroupId, stoppingToken);
+                if (!result.IsSuccess)
                 {
-                    logger.LogInformation("Group {GroupId} is full; match generation is not implemented", teamAdded.GroupId);
+                    logger.LogWarning("Skipping match generation for group {GroupId}: {Error}", teamAdded.GroupId, result.Error);
+                }
+                else if (result.Value > 0)
+                {
+                    logger.LogInformation(
+                        "Group {GroupId} is full; created {MatchCount} round-robin matches", teamAdded.GroupId, result.Value);
                 }
             }
             catch (JsonException exception)
             {
                 logger.LogWarning(exception, "Ignoring malformed tournament.team-add message");
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                // Keep consuming; a later team-add message for the same group retries generation.
+                logger.LogError(exception, "Match generation failed for tournament.team-add message");
             }
         }
     }

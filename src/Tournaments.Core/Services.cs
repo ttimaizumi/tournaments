@@ -5,10 +5,15 @@ public sealed class TournamentService(ITournamentRepository tournaments, IMessag
     public Task<IReadOnlyList<Tournament>> GetAllAsync(CancellationToken cancellationToken = default) =>
         tournaments.GetAllAsync(cancellationToken);
 
-    public async Task<string> CreateAsync(Tournament tournament, CancellationToken cancellationToken = default)
+    public async Task<OperationResult<string>> CreateAsync(Tournament tournament, CancellationToken cancellationToken = default)
     {
+        if (tournament.Format.Validate() is { } error)
+        {
+            return OperationResult<string>.Failure(error);
+        }
+
         var id = await tournaments.CreateAsync(tournament, cancellationToken);
         await messages.PublishAsync("tournament.created", id, cancellationToken);
-        return id;
+        return OperationResult<string>.Success(id);
     }
 }

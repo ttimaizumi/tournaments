@@ -50,10 +50,14 @@ CREATE UNIQUE INDEX tournament_group_unique_name_idx ON GROUPS (tournament_id,(d
 
 CREATE TABLE MATCHES (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    TOURNAMENT_ID UUID not null references TOURNAMENTS(ID),
     document JSONB NOT NULL,
     last_update_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+-- One match per slot; makes schedule generation idempotent (INSERT ... ON CONFLICT DO NOTHING).
+CREATE UNIQUE INDEX match_unique_slot_idx ON MATCHES (
+    tournament_id, (document->>'stage'), (document->>'round'), (document->>'matchNumber'));
 
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO tournament_svc;
 GRANT DELETE ON ALL TABLES IN SCHEMA public TO tournament_svc;

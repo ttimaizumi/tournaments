@@ -48,12 +48,14 @@ builder.Services.AddSingleton(_ => new NpgsqlDataSourceBuilder(
 builder.Services.AddScoped<ITeamRepository, TeamRepository>();
 builder.Services.AddScoped<ITournamentRepository, TournamentRepository>();
 builder.Services.AddScoped<IGroupRepository, GroupRepository>();
+builder.Services.AddScoped<IMatchRepository, MatchRepository>();
 builder.Services.AddSingleton<IMessagePublisher>(_ => new ActiveMqMessagePublisher(
     builder.Configuration["ActiveMq:BrokerUri"]
     ?? throw new InvalidOperationException("ActiveMq:BrokerUri is required.")));
 builder.Services.AddScoped<TeamDelegate>();
 builder.Services.AddScoped<GroupDelegate>();
 builder.Services.AddScoped<TournamentService>();
+builder.Services.AddScoped<MatchDelegate>();
 
 var app = builder.Build();
 
@@ -93,8 +95,13 @@ app.MapPost("/tournaments", async (
     TournamentService tournaments,
     CancellationToken cancellationToken) =>
 {
-    var id = await tournaments.CreateAsync(tournament, cancellationToken);
-    context.Response.Headers.Location = id;
+    var result = await tournaments.CreateAsync(tournament, cancellationToken);
+    if (!result.IsSuccess)
+    {
+        return Results.Text(result.Error, statusCode: StatusCodes.Status422UnprocessableEntity);
+    }
+
+    context.Response.Headers.Location = result.Value;
     return Results.StatusCode(StatusCodes.Status201Created);
 });
 
@@ -144,6 +151,48 @@ app.MapMethods("/tournaments/{tournamentId}/groups/{groupId}/teams", ["PATCH"], 
     return result.IsSuccess
         ? Results.NoContent()
         : Results.Text(result.Error, statusCode: StatusCodes.Status422UnprocessableEntity);
+});
+
+app.MapGet("/tournaments/{tournamentId}/matches", async (
+    string tournamentId,
+    MatchStage? stage,
+    MatchDelegate matches,
+    CancellationToken cancellationToken) =>
+    Results.Json(await matches.GetMatchesAsync(tournamentId, stage, cancellationToken)));
+
+app.MapGet("/tournaments/{tournamentId}/matches/{matchId}", async (
+    string tournamentId,
+    string matchId,
+    MatchDelegate matches,
+    CancellationToken cancellationToken) =>
+{
+    var match = await matches.GetMatchAsync(tournamentId, matchId, cancellationToken);
+    return match is null ? Results.NotFound() : Results.Json(match);
+});
+
+app.MapPut("/tournaments/{tournamentId}/matches/{matchId}/score", async (
+    string tournamentId,
+    string matchId,
+    Score score,
+    MatchDelegate matches,
+    CancellationToken cancellationToken) =>
+{
+    var result = await matches.UpdateScoreAsync(tournamentId, matchId, score, cancellationToken);
+    return result switch
+    {
+        { IsSuccess: true } => Results.NoContent(),
+        { IsNotFound: true } => Results.Text(result.Error, statusCode: StatusCodes.Status404NotFound),
+        _ => Results.Text(result.Error, statusCode: StatusCodes.Status422UnprocessableEntity)
+    };
+});
+
+app.MapGet("/tournaments/{tournamentId}/standings", async (
+    string tournamentId,
+    MatchDelegate matches,
+    CancellationToken cancellationToken) =>
+{
+    var standings = await matches.GetStandingsAsync(tournamentId, cancellationToken);
+    return standings is null ? Results.NotFound() : Results.Json(standings);
 });
 
 app.Run();

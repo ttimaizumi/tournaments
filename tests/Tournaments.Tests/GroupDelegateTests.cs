@@ -99,7 +99,7 @@ public sealed class GroupDelegateTests
                 .ToList()
         });
         var publisher = new FakeMessagePublisher();
-        var service = new GroupDelegate(new FakeTournamentRepository(), groupRepository, teamRepository, publisher);
+        var service = new GroupDelegate(TournamentRepositoryWith(tournamentId), groupRepository, teamRepository, publisher);
 
         var result = await service.AddTeamsAsync(tournamentId, groupId, [newTeam]);
 
@@ -124,12 +124,96 @@ public sealed class GroupDelegateTests
         var groupRepository = new FakeGroupRepository();
         groupRepository.Groups.Add(new Group { Id = groupId, TournamentId = tournamentId });
         var service = new GroupDelegate(
-            new FakeTournamentRepository(), groupRepository, teamRepository, new FakeMessagePublisher());
+            TournamentRepositoryWith(tournamentId), groupRepository, teamRepository, new FakeMessagePublisher());
 
         var result = await service.AddTeamsAsync(tournamentId, groupId, [team, team]);
 
         Assert.False(result.IsSuccess);
         Assert.Empty(groupRepository.Groups[0].Teams);
+    }
+
+    [Fact]
+    public async Task AddTeams_rejects_33rd_team()
+    {
+        var tournamentId = Guid.NewGuid().ToString();
+        var groupId = Guid.NewGuid().ToString();
+        var extra = new Team { Id = Guid.NewGuid().ToString(), Name = "Team 33" };
+        var teamRepository = new FakeTeamRepository();
+        teamRepository.Teams.Add(extra);
+        var groupRepository = new FakeGroupRepository();
+        groupRepository.Groups.Add(new Group { Id = groupId, TournamentId = tournamentId, Teams = Teams(32) });
+        var publisher = new FakeMessagePublisher();
+        var service = new GroupDelegate(TournamentRepositoryWith(tournamentId), groupRepository, teamRepository, publisher);
+
+        var result = await service.AddTeamsAsync(tournamentId, groupId, [extra]);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Group at max capacity", result.Error);
+        Assert.Equal(32, groupRepository.Groups[0].Teams.Count);
+        Assert.Empty(publisher.Messages);
+    }
+
+    [Fact]
+    public async Task SaveGroup_rejects_second_group()
+    {
+        var tournamentId = Guid.NewGuid().ToString();
+        var groupRepository = new FakeGroupRepository();
+        groupRepository.Groups.Add(new Group { Id = Guid.NewGuid().ToString(), TournamentId = tournamentId, Name = "A" });
+        var groupDelegate = CreateDelegate(TournamentRepositoryWith(tournamentId), groupRepository);
+
+        var result = await groupDelegate.SaveGroupAsync(tournamentId, new Group { Name = "B" });
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Tournament already has 1 group(s)", result.Error);
+        Assert.Single(groupRepository.Groups);
+    }
+
+    [Fact]
+    public async Task SaveGroup_with_teams_publishes_team_add_events()
+    {
+        var tournamentId = Guid.NewGuid().ToString();
+        var teamRepository = new FakeTeamRepository();
+        var teams = Teams(32);
+        teamRepository.Teams.AddRange(teams);
+        var publisher = new FakeMessagePublisher();
+        var service = new GroupDelegate(
+            TournamentRepositoryWith(tournamentId), new FakeGroupRepository(), teamRepository, publisher);
+
+        var result = await service.SaveGroupAsync(
+            tournamentId, new Group { Teams = teams.Select(team => new Team { Id = team.Id }).ToList() });
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(32, publisher.Messages.Count);
+        Assert.All(publisher.Messages, message => Assert.Equal(GroupDelegate.TeamAddQueue, message.Queue));
+    }
+
+    [Fact]
+    public async Task SaveGroup_rejects_duplicate_teams()
+    {
+        var tournamentId = Guid.NewGuid().ToString();
+        var team = new Team { Id = Guid.NewGuid().ToString(), Name = "Falcons" };
+        var teamRepository = new FakeTeamRepository();
+        teamRepository.Teams.Add(team);
+        var groupRepository = new FakeGroupRepository();
+        var service = new GroupDelegate(
+            TournamentRepositoryWith(tournamentId), groupRepository, teamRepository, new FakeMessagePublisher());
+
+        var result = await service.SaveGroupAsync(tournamentId, new Group { Teams = [team, team] });
+
+        Assert.False(result.IsSuccess);
+        Assert.Empty(groupRepository.Groups);
+    }
+
+    internal static List<Team> Teams(int count) =>
+        Enumerable.Range(1, count)
+            .Select(number => new Team { Id = Guid.NewGuid().ToString(), Name = $"Team {number:D2}" })
+            .ToList();
+
+    internal static FakeTournamentRepository TournamentRepositoryWith(string tournamentId)
+    {
+        var repository = new FakeTournamentRepository();
+        repository.Tournaments.Add(new Tournament { Id = tournamentId, Name = "Cup" });
+        return repository;
     }
 
     private static GroupDelegate CreateDelegate(

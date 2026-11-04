@@ -176,21 +176,30 @@ public sealed class GroupRepository(NpgsqlDataSource dataSource) : IGroupReposit
         return id.ToString();
     }
 
-    public async Task AddTeamAsync(string groupId, Team team, CancellationToken cancellationToken = default)
+    public async Task<bool> AddTeamsAsync(
+        string groupId,
+        IReadOnlyList<Team> teams,
+        int maxTeams,
+        CancellationToken cancellationToken = default)
     {
+        // The capacity and uniqueness predicates are re-evaluated against the latest row version when
+        // a concurrent UPDATE commits first, so two requests can't jointly overfill the group.
         const string sql = """
             UPDATE groups
-            SET document = jsonb_set(document, '{teams}', COALESCE(document->'teams', '[]'::jsonb) || @team::jsonb),
+            SET document = jsonb_set(document, '{teams}', COALESCE(document->'teams', '[]'::jsonb) || @teams::jsonb),
                 last_update_date = CURRENT_TIMESTAMP
             WHERE id = @groupId
+              AND jsonb_array_length(COALESCE(document->'teams', '[]'::jsonb)) + jsonb_array_length(@teams::jsonb) <= @maxTeams
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM jsonb_array_elements(COALESCE(document->'teams', '[]'::jsonb)) AS existing(team)
+                  WHERE existing.team->>'id' IN (SELECT added->>'id' FROM jsonb_array_elements(@teams::jsonb) AS added))
             """;
         await using var command = dataSource.CreateCommand(sql);
         command.Parameters.AddWithValue("groupId", Guid.Parse(groupId));
-        command.Parameters.AddWithValue("team", NpgsqlDbType.Jsonb, DatabaseJson.Serialize(team));
-        if (await command.ExecuteNonQueryAsync(cancellationToken) == 0)
-        {
-            throw new InvalidOperationException("Group no longer exists.");
-        }
+        command.Parameters.AddWithValue("teams", NpgsqlDbType.Jsonb, DatabaseJson.Serialize(teams));
+        command.Parameters.AddWithValue("maxTeams", maxTeams);
+        return await command.ExecuteNonQueryAsync(cancellationToken) == 1;
     }
 
     private static Group ReadGroup(NpgsqlDataReader reader)
@@ -199,5 +208,109 @@ public sealed class GroupRepository(NpgsqlDataSource dataSource) : IGroupReposit
         group.Id = reader.GetGuid(0).ToString();
         group.TournamentId = reader.GetGuid(1).ToString();
         return group;
+    }
+}
+
+public sealed class MatchRepository(NpgsqlDataSource dataSource) : IMatchRepository
+{
+    private const string Columns = "id, tournament_id, document::text";
+
+    public async Task<Match?> GetAsync(string tournamentId, string matchId, CancellationToken cancellationToken = default)
+    {
+        const string sql = $"SELECT {Columns} FROM matches WHERE tournament_id = @tournamentId AND id = @matchId";
+        if (!Guid.TryParse(tournamentId, out var parsedTournamentId) || !Guid.TryParse(matchId, out var parsedMatchId))
+        {
+            return null;
+        }
+
+        await using var command = dataSource.CreateCommand(sql);
+        command.Parameters.AddWithValue("tournamentId", parsedTournamentId);
+        command.Parameters.AddWithValue("matchId", parsedMatchId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken) ? ReadMatch(reader) : null;
+    }
+
+    public async Task<IReadOnlyList<Match>> GetAllAsync(string tournamentId, CancellationToken cancellationToken = default)
+    {
+        const string sql = $"""
+            SELECT {Columns}
+            FROM matches
+            WHERE tournament_id = @tournamentId
+            ORDER BY document->>'stage' = 'PLAYOFF', (document->>'round')::int, (document->>'matchNumber')::int
+            """;
+        if (!Guid.TryParse(tournamentId, out var parsedTournamentId))
+        {
+            return [];
+        }
+
+        await using var command = dataSource.CreateCommand(sql);
+        command.Parameters.AddWithValue("tournamentId", parsedTournamentId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var matches = new List<Match>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            matches.Add(ReadMatch(reader));
+        }
+
+        return matches;
+    }
+
+    public async Task<int> CreateManyAsync(IReadOnlyList<Match> matches, CancellationToken cancellationToken = default)
+    {
+        if (matches.Count == 0)
+        {
+            return 0;
+        }
+
+        var tournamentId = matches[0].TournamentId;
+        if (matches.Any(match => match.TournamentId != tournamentId))
+        {
+            throw new ArgumentException("All matches must belong to one tournament.", nameof(matches));
+        }
+
+        // One statement, so the whole schedule lands or none of it does; the unique slot index
+        // turns a duplicate generation (redelivered message, concurrent score update) into a no-op.
+        const string sql = """
+            INSERT INTO matches(tournament_id, document)
+            SELECT @tournamentId, match.document
+            FROM jsonb_array_elements(@documents::jsonb) AS match(document)
+            ON CONFLICT DO NOTHING
+            """;
+        await using var command = dataSource.CreateCommand(sql);
+        command.Parameters.AddWithValue("tournamentId", Guid.Parse(tournamentId));
+        command.Parameters.AddWithValue("documents", NpgsqlDbType.Jsonb, DatabaseJson.Serialize(matches));
+        return await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task<bool> UpdateScoreAsync(
+        string tournamentId,
+        string matchId,
+        Score score,
+        CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            UPDATE matches
+            SET document = jsonb_set(document, '{score}', @score::jsonb),
+                last_update_date = CURRENT_TIMESTAMP
+            WHERE tournament_id = @tournamentId AND id = @matchId
+            """;
+        if (!Guid.TryParse(tournamentId, out var parsedTournamentId) || !Guid.TryParse(matchId, out var parsedMatchId))
+        {
+            return false;
+        }
+
+        await using var command = dataSource.CreateCommand(sql);
+        command.Parameters.AddWithValue("tournamentId", parsedTournamentId);
+        command.Parameters.AddWithValue("matchId", parsedMatchId);
+        command.Parameters.AddWithValue("score", NpgsqlDbType.Jsonb, DatabaseJson.Serialize(score));
+        return await command.ExecuteNonQueryAsync(cancellationToken) == 1;
+    }
+
+    private static Match ReadMatch(NpgsqlDataReader reader)
+    {
+        var match = DatabaseJson.Deserialize<Match>(reader.GetString(2));
+        match.Id = reader.GetGuid(0).ToString();
+        match.TournamentId = reader.GetGuid(1).ToString();
+        return match;
     }
 }

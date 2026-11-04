@@ -8,6 +8,10 @@ public sealed class GroupDelegate(
     ITeamRepository teams,
     IMessagePublisher messages)
 {
+    public const string TeamAddQueue = "tournament.team-add";
+
+    private static readonly JsonSerializerOptions EventJson = new(JsonSerializerDefaults.Web);
+
     public Task<IReadOnlyList<Group>> GetAllGroupsAsync(string tournamentId, CancellationToken cancellationToken = default) =>
         groups.GetAllAsync(tournamentId, cancellationToken);
 
@@ -25,16 +29,42 @@ public sealed class GroupDelegate(
             return OperationResult<string>.Failure("Tournament doesn't exist");
         }
 
-        group.TournamentId = tournament.Id!;
+        var existingGroups = await groups.GetAllAsync(tournamentId, cancellationToken);
+        if (existingGroups.Count >= tournament.Format.NumberOfGroups)
+        {
+            return OperationResult<string>.Failure(
+                $"Tournament already has {tournament.Format.NumberOfGroups} group(s)");
+        }
+
+        if (group.Teams.Count > tournament.Format.MaxTeamsPerGroup)
+        {
+            return OperationResult<string>.Failure("Group at max capacity");
+        }
+
+        var batchIds = new HashSet<string>(StringComparer.Ordinal);
+        var persistedTeams = new List<Team>(group.Teams.Count);
         foreach (var requestedTeam in group.Teams)
         {
-            if (requestedTeam.Id is null || await teams.GetAsync(requestedTeam.Id, cancellationToken) is null)
+            var persistedTeam = requestedTeam.Id is null ? null : await teams.GetAsync(requestedTeam.Id, cancellationToken);
+            if (persistedTeam is null)
             {
                 return OperationResult<string>.Failure("Team doesn't exist");
             }
+
+            if (!batchIds.Add(persistedTeam.Id!))
+            {
+                return OperationResult<string>.Failure($"Team {persistedTeam.Id} already exist");
+            }
+
+            persistedTeams.Add(persistedTeam);
         }
 
-        return OperationResult<string>.Success(await groups.CreateAsync(group, cancellationToken));
+        group.TournamentId = tournament.Id!;
+        group.Teams = persistedTeams;
+        var groupId = await groups.CreateAsync(group, cancellationToken);
+        // A group created already full must trigger match generation just like one filled by PATCH.
+        await PublishTeamsAddedAsync(tournamentId, groupId, persistedTeams, cancellationToken);
+        return OperationResult<string>.Success(groupId);
     }
 
     public async Task<OperationResult> AddTeamsAsync(
@@ -43,13 +73,20 @@ public sealed class GroupDelegate(
         IReadOnlyCollection<Team> requestedTeams,
         CancellationToken cancellationToken = default)
     {
+        var tournament = await tournaments.GetAsync(tournamentId, cancellationToken);
+        if (tournament is null)
+        {
+            return OperationResult.Failure("Tournament doesn't exist");
+        }
+
         var group = await groups.GetAsync(tournamentId, groupId, cancellationToken);
         if (group is null)
         {
             return OperationResult.Failure("Group doesn't exist");
         }
 
-        if (group.Teams.Count + requestedTeams.Count > 32)
+        var maxTeams = tournament.Format.MaxTeamsPerGroup;
+        if (group.Teams.Count + requestedTeams.Count > maxTeams)
         {
             return OperationResult.Failure("Group at max capacity");
         }
@@ -73,20 +110,29 @@ public sealed class GroupDelegate(
             persistedTeams.Add(persistedTeam);
         }
 
-        foreach (var team in persistedTeams)
+        // The repository re-checks capacity and uniqueness atomically, closing the race between
+        // concurrent requests that each passed the checks above.
+        if (!await groups.AddTeamsAsync(groupId, persistedTeams, maxTeams, cancellationToken))
         {
-            await groups.AddTeamAsync(groupId, team, cancellationToken);
-            var body = JsonSerializer.Serialize(
-                new TeamAddEvent
-                {
-                    TournamentId = tournamentId,
-                    GroupId = groupId,
-                    TeamId = team.Id!
-                },
-                new JsonSerializerOptions(JsonSerializerDefaults.Web));
-            await messages.PublishAsync("tournament.team-add", body, cancellationToken);
+            return OperationResult.Failure("Group at max capacity or team already exist");
         }
 
+        await PublishTeamsAddedAsync(tournamentId, groupId, persistedTeams, cancellationToken);
         return OperationResult.Success();
+    }
+
+    private async Task PublishTeamsAddedAsync(
+        string tournamentId,
+        string groupId,
+        IEnumerable<Team> added,
+        CancellationToken cancellationToken)
+    {
+        foreach (var team in added)
+        {
+            var body = JsonSerializer.Serialize(
+                new TeamAddEvent { TournamentId = tournamentId, GroupId = groupId, TeamId = team.Id! },
+                EventJson);
+            await messages.PublishAsync(TeamAddQueue, body, cancellationToken);
+        }
     }
 }
